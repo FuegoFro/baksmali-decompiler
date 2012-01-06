@@ -146,6 +146,46 @@ public class TypeIdItem extends Item<TypeIdItem> {
         return typeDescriptor.getStringValue();
     }
 
+    public String getJavaTypeDescriptor() {
+        return parseType(typeDescriptor.getStringValue());
+    }
+
+    public String getShortJavaTypeDescriptor() {
+        String descriptor = getJavaTypeDescriptor();
+        int lastPeriod = descriptor.lastIndexOf('.');
+        if (lastPeriod >= 0) {
+            descriptor = descriptor.substring(lastPeriod + 1);
+        }
+        return descriptor;
+    }
+
+    private String parseType(String typeString) {
+        if (typeString.charAt(0) == 'L') {
+            typeString = typeString.substring(1, typeString.length() - 1).replace("/", ".").replace("$", ".");
+        } else if(typeString.charAt(0) == '[') {
+            typeString = parseType(typeString.substring(1)) + "[]";
+        } else if(typeString.equals("V")) {
+            typeString = "void";
+        } else if(typeString.equals("Z")) {
+            typeString = "boolean";
+        } else if(typeString.equals("B")) {
+            typeString = "byte";
+        } else if(typeString.equals("S")) {
+            typeString = "short";
+        } else if(typeString.equals("C")) {
+            typeString = "char";
+        } else if(typeString.equals("I")) {
+            typeString = "int";
+        } else if(typeString.equals("J")) {
+            typeString = "long";
+        } else if(typeString.equals("F")) {
+            typeString = "float";
+        } else if(typeString.equals("D")) {
+            typeString = "double";
+        }
+        return typeString;
+    }
+
     /**
      * Returns the "shorty" representation of this type, used to create the shorty prototype string for a method
      * @return the "shorty" representation of this type, used to create the shorty prototype string for a method

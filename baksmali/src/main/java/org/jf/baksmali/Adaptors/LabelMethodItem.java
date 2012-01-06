@@ -71,7 +71,7 @@ public class LabelMethodItem extends MethodItem {
 
 
     public boolean writeTo(IndentingWriter writer) throws IOException {
-        writer.write(':');
+        writer.write("//");
         writer.write(labelPrefix);
         if (baksmali.useSequentialLabels) {
             writer.printUnsignedLongAsHex(labelSequence);

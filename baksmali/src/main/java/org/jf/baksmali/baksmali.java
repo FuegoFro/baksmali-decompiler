@@ -145,7 +145,7 @@ public class baksmali {
             }
         });
 
-        ClassFileNameHandler fileNameHandler = new ClassFileNameHandler(outputDirectoryFile, ".smali");
+        ClassFileNameHandler fileNameHandler = new ClassFileNameHandler(outputDirectoryFile, ".java");
 
         for (ClassDefItem classDefItem: classDefItems) {
             /**

@@ -28,11 +28,10 @@
 
 package org.jf.baksmali.Adaptors;
 
-import org.jf.dexlib.Util.Utf8Utils;
-import org.jf.util.IndentingWriter;
 import org.jf.dexlib.CodeItem;
 import org.jf.dexlib.StringIdItem;
 import org.jf.dexlib.TypeIdItem;
+import org.jf.util.IndentingWriter;
 
 import java.io.IOException;
 
@@ -48,76 +47,29 @@ public abstract class DebugMethodItem extends MethodItem {
         return sortOrder;
     }
 
-    protected static void writeLine(IndentingWriter writer, int line) throws IOException {
-        writer.write(".line ");
-        writer.printSignedIntAsDec(line);
-    }
-
-    protected static void writeEndPrologue(IndentingWriter writer) throws IOException {
-        writer.write(".prologue");
-    }
-
-    protected static void writeBeginEpilogue(IndentingWriter writer) throws IOException {
-        writer.write(".epilogue");
-    }
-
     protected static void writeStartLocal(IndentingWriter writer, CodeItem codeItem, int register,
                                           StringIdItem name, TypeIdItem type, StringIdItem signature)
-                                          throws IOException {
-        writer.write(".local ");
-        RegisterFormatter.writeTo(writer, codeItem, register);
-        writer.write(", ");
+            throws IOException {
+        boolean wroteSignature = false;
+        if (signature != null && signature.getStringValue().charAt(0) == 'L' && signature.getStringValue().contains("<")) {
+            String signatureValue = signature.getStringValue();
+            signatureValue = signatureValue.substring(1, signatureValue.length() - 1)
+                    .replace('/', '.').replace("<L", "<").replace(";>", ">");
+            writer.write(signatureValue);
+            wroteSignature = true;
+        } else {
+            writer.write(type.getShortJavaTypeDescriptor());
+        }
+        writer.write(' ');
         writer.write(name.getStringValue());
-        writer.write(':');
-        writer.write(type.getTypeDescriptor());
-        if (signature != null) {
+        writer.write(" = ");
+        RegisterFormatter.writeTo(writer, codeItem, register);
+        if (signature != null && !wroteSignature) {
             writer.write(",\"");
             writer.write(signature.getStringValue());
             writer.write('"');
         }
-    }
-
-    protected static void writeEndLocal(IndentingWriter writer, CodeItem codeItem, int register, StringIdItem name,
-                                       TypeIdItem type, StringIdItem signature) throws IOException {
-        writer.write(".end local ");
-        RegisterFormatter.writeTo(writer, codeItem, register);
-
-        if (name != null) {
-            writer.write("           #");
-            writer.write(name.getStringValue());
-            writer.write(':');
-            writer.write(type.getTypeDescriptor());
-            if (signature != null) {
-                writer.write(",\"");
-                writer.write(signature.getStringValue());
-                writer.write('"');
-            }
-        }
-    }
-
-
-    protected static void writeRestartLocal(IndentingWriter writer, CodeItem codeItem, int register,
-                                         StringIdItem name, TypeIdItem type, StringIdItem signature)
-                                         throws IOException {
-        writer.write(".restart local ");
-        RegisterFormatter.writeTo(writer, codeItem, register);
-
-        if (name != null) {
-            writer.write("       #");
-            writer.write(name.getStringValue());
-            writer.write(':');
-            writer.write(type.getTypeDescriptor());
-            if (signature != null) {
-                writer.write(",\"");
-                writer.write(signature.getStringValue());
-                writer.write('"');
-            }
-        }
-    }
-
-    protected static void writeSetFile(IndentingWriter writer, String fileName) throws IOException {
-        writer.write(".source \"");
-        Utf8Utils.writeEscapedString(writer, fileName);
-        writer.write('"');
+        RegisterFormatter.setRegisterContents(register, name.getStringValue());
+        RegisterFormatter.setLocal(register, true);
     }
 }

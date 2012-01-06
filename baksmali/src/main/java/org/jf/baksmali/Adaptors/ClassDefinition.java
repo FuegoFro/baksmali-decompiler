@@ -28,8 +28,6 @@
 
 package org.jf.baksmali.Adaptors;
 
-import org.jf.dexlib.Util.Utf8Utils;
-import org.jf.util.IndentingWriter;
 import org.jf.dexlib.*;
 import org.jf.dexlib.Code.Analysis.ValidationException;
 import org.jf.dexlib.Code.Format.Instruction21c;
@@ -38,6 +36,7 @@ import org.jf.dexlib.Code.Instruction;
 import org.jf.dexlib.EncodedValue.EncodedValue;
 import org.jf.dexlib.Util.AccessFlags;
 import org.jf.dexlib.Util.SparseArray;
+import org.jf.util.IndentingWriter;
 
 import java.io.IOException;
 import java.util.List;
@@ -141,23 +140,35 @@ public class ClassDefinition {
     }
 
     public void writeTo(IndentingWriter writer) throws IOException {
+        writePackage(writer);
         writeClass(writer);
         writeSuper(writer);
-        writeSourceFile(writer);
         writeInterfaces(writer);
+        writer.write(" {\n");
+        writer.indent(4);
         writeAnnotations(writer);
         writeStaticFields(writer);
         writeInstanceFields(writer);
         writeDirectMethods(writer);
         writeVirtualMethods(writer);
-        return ;
+        writer.deindent(4);
+        writer.write("}");
+    }
+
+    private void writePackage(IndentingWriter writer) throws IOException {
+        writer.write("package ");
+        String descriptor = classDefItem.getClassType().getJavaTypeDescriptor();
+        int lastPeriod = descriptor.lastIndexOf('.');
+        writer.write(descriptor.substring(0, lastPeriod));
+        writer.write(";\n\n");
+
     }
 
     private void writeClass(IndentingWriter writer) throws IOException {
-        writer.write(".class ");
         writeAccessFlags(writer);
-        writer.write(classDefItem.getClassType().getTypeDescriptor());
-        writer.write('\n');
+        writer.write("class ");
+        String descriptor = classDefItem.getClassType().getShortJavaTypeDescriptor();
+        writer.write(descriptor);
     }
 
     private void writeAccessFlags(IndentingWriter writer) throws IOException {
@@ -169,19 +180,9 @@ public class ClassDefinition {
 
     private void writeSuper(IndentingWriter writer) throws IOException {
         TypeIdItem superClass = classDefItem.getSuperclass();
-        if (superClass != null) {
-            writer.write(".super ");
-            writer.write(superClass.getTypeDescriptor());
-            writer.write('\n');
-        }
-    }
-
-    private void writeSourceFile(IndentingWriter writer) throws IOException {
-        StringIdItem sourceFile = classDefItem.getSourceFile();
-        if (sourceFile != null) {
-            writer.write(".source \"");
-            Utf8Utils.writeEscapedString(writer, sourceFile.getStringValue());
-            writer.write("\"\n");
+        if ((superClass != null) && (!superClass.getTypeDescriptor().equals("Ljava/lang/Object;"))) {
+            writer.write(" extends ");
+            writer.write(superClass.getShortJavaTypeDescriptor());
         }
     }
 
@@ -196,12 +197,14 @@ public class ClassDefinition {
             return;
         }
 
-        writer.write('\n');
-        writer.write("# interfaces\n");
+        writer.write(" implements ");
+        boolean firstTime = true;
         for (TypeIdItem typeIdItem: interfaceList.getTypes()) {
-            writer.write(".implements ");
-            writer.write(typeIdItem.getTypeDescriptor());
-            writer.write('\n');
+            if (!firstTime) {
+                writer.write(", ");
+            }
+            firstTime = false;
+            writer.write(typeIdItem.getShortJavaTypeDescriptor());
         }
     }
 
@@ -243,7 +246,6 @@ public class ClassDefinition {
         }
 
         writer.write("\n\n");
-        writer.write("# static fields\n");
 
         boolean first = true;
         for (int i=0; i<encodedFields.length; i++) {
@@ -277,7 +279,6 @@ public class ClassDefinition {
         }
 
         writer.write("\n\n");
-        writer.write("# instance fields\n");
         boolean first = true;
         for (ClassDataItem.EncodedField field: classDataItem.getInstanceFields()) {
             if (!first) {
@@ -303,7 +304,7 @@ public class ClassDefinition {
         }
 
         writer.write("\n\n");
-        writer.write("# direct methods\n");
+        writer.write("// direct methods\n");
         writeMethods(writer, directMethods);
     }
 
@@ -319,7 +320,7 @@ public class ClassDefinition {
         }
 
         writer.write("\n\n");
-        writer.write("# virtual methods\n");
+        writer.write("// virtual methods\n");
         writeMethods(writer, virtualMethods);
     }
 

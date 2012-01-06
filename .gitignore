@@ -4,3 +4,5 @@
 /util/target
 /maven-smali-plugin/target
 /smali-integration-tests/target
+*.iml
+.idea/

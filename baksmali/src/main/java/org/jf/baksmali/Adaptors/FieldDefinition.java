@@ -58,17 +58,16 @@ public class FieldDefinition {
             writer.write("#the value of this static final field might be set in the static constructor\n");
         }
 
-        writer.write(".field ");
         writeAccessFlags(writer, encodedField);
+        writer.write(encodedField.field.getFieldType().getShortJavaTypeDescriptor());
+        writer.write(' ');
         writer.write(encodedField.field.getFieldName().getStringValue());
-        writer.write(':');
-        writer.write(encodedField.field.getFieldType().getTypeDescriptor());
         if (initialValue != null) {
             writer.write(" = ");
             EncodedValueAdaptor.writeTo(writer, initialValue);
         }
 
-        writer.write('\n');
+        writer.write(";\n");
 
         if (annotationSet != null) {
             writer.indent(4);

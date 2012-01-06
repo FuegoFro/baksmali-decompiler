@@ -31,6 +31,9 @@ package org.jf.dexlib;
 import org.jf.dexlib.Util.AnnotatedOutput;
 import org.jf.dexlib.Util.Input;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class ProtoIdItem extends Item<ProtoIdItem> {
     private int hashCode = 0;
 
@@ -167,6 +170,16 @@ public class ProtoIdItem extends Item<ProtoIdItem> {
             cachedPrototypeString = sb.toString();
         }
         return cachedPrototypeString;
+    }
+
+    /**
+     * @return a <code>List<TypeIdItem></code> of respective types of the parameters
+     */
+    public List<TypeIdItem> getParameterTypes() {
+        if (parameters != null) {
+            return parameters.getTypes();
+        }
+        return new ArrayList<TypeIdItem>();
     }
 
     /**

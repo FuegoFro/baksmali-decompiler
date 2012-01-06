@@ -28,52 +28,67 @@
 
 package org.jf.baksmali.Adaptors;
 
-import org.jf.util.IndentingWriter;
 import org.jf.dexlib.*;
 import org.jf.dexlib.Util.Utf8Utils;
+import org.jf.util.IndentingWriter;
 
 import java.io.IOException;
 
 public class ReferenceFormatter {
-    public static void writeReference(IndentingWriter writer, Item item) throws IOException {
+    public static String getReference(Item item, boolean staticMethod) {
         switch (item.getItemType()) {
             case TYPE_METHOD_ID_ITEM:
-                writeMethodReference(writer, (MethodIdItem)item);
-                return;
+                return getMethodReference((MethodIdItem) item, staticMethod);
             case TYPE_FIELD_ID_ITEM:
-                writeFieldReference(writer, (FieldIdItem)item);
-                return;
+                return getFieldReference((FieldIdItem) item);
             case TYPE_STRING_ID_ITEM:
-                writeStringReference(writer, (StringIdItem)item);
-                return;
+                return getStringReference((StringIdItem) item);
             case TYPE_TYPE_ID_ITEM:
-                writeTypeReference(writer, (TypeIdItem)item);
-                return;
+                return getTypeReference((TypeIdItem) item);
         }
+        return "";
+    }
+
+    public static String getMethodReference(MethodIdItem item, boolean includeClassName) {
+        String methodName = item.getMethodName().getStringValue();
+        String descriptor = item.getContainingClass().getShortJavaTypeDescriptor();
+        if (methodName.equals("<init>") || methodName.equals("<clinit>")) {
+            return descriptor;
+        } else if (includeClassName) {
+            return descriptor + "." + methodName;
+        }
+        return methodName;
+    }
+
+    public static String getFieldReference(FieldIdItem item) {
+        return item.getFieldName().getStringValue();
+    }
+
+    public static String getStringReference(StringIdItem item) {
+        return '"' + Utf8Utils.escapeString(item.getStringValue()) + '"';
+    }
+
+    public static String getTypeReference(TypeIdItem item) {
+        return item.getShortJavaTypeDescriptor();
+    }
+
+    public static void writeReference(IndentingWriter writer, Item item) throws IOException {
+        writer.write(getReference(item, false));
     }
 
     public static void writeMethodReference(IndentingWriter writer, MethodIdItem item) throws IOException {
-        writer.write(item.getContainingClass().getTypeDescriptor());
-        writer.write("->");
-        writer.write(item.getMethodName().getStringValue());
-        writer.write(item.getPrototype().getPrototypeString());
+        writer.write(getMethodReference(item, false));
     }
 
     public static void writeFieldReference(IndentingWriter writer, FieldIdItem item) throws IOException {
-        writer.write(item.getContainingClass().getTypeDescriptor());
-        writer.write("->");
-        writer.write(item.getFieldName().getStringValue());
-        writer.write(':');
-        writer.write(item.getFieldType().getTypeDescriptor());
+        writer.write(getFieldReference(item));
     }
 
     public static void writeStringReference(IndentingWriter writer, StringIdItem item) throws IOException {
-        writer.write('"');
-        Utf8Utils.writeEscapedString(writer, item.getStringValue());
-        writer.write('"');
+        writer.write(getStringReference(item));
     }
 
     public static void writeTypeReference(IndentingWriter writer, TypeIdItem item) throws IOException {
-        writer.write(item.getTypeDescriptor());
+        writer.write(getTypeReference(item));
     }
 }

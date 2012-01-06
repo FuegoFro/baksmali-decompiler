@@ -28,10 +28,10 @@
 
 package org.jf.baksmali.Adaptors;
 
-import org.jf.util.IndentingWriter;
 import org.jf.baksmali.baksmali;
 import org.jf.dexlib.CodeItem;
 import org.jf.dexlib.Util.AccessFlags;
+import org.jf.util.IndentingWriter;
 
 import java.io.IOException;
 
@@ -39,42 +39,69 @@ import java.io.IOException;
  * This class contains the logic used for formatting registers
  */
 public class RegisterFormatter {
+    private static String[] registerContents;
+    private static boolean[] locals;
 
-    /**
-     * Write out the register range value used by Format3rc. If baksmali.noParameterRegisters is true, it will always
-     * output the registers in the v<n> format. But if false, then it will check if *both* registers are parameter
-     * registers, and if so, use the p<n> format for both. If only the last register is a parameter register, it will
-     * use the v<n> format for both, otherwise it would be confusing to have something like {v20 .. p1}
-     * @param writer the <code>IndentingWriter</code> to write to
-     * @param codeItem the <code>CodeItem</code> that the register is from
-     * @param startRegister the first register in the range
-     * @param lastRegister the last register in the range
-     */
-    public static void writeRegisterRange(IndentingWriter writer, CodeItem codeItem, int startRegister,
-                                          int lastRegister) throws IOException {
-        assert lastRegister >= startRegister;
+    public static void newRegisterSet(int registers) {
+        registerContents = new String[registers];
+        locals = new boolean[registers];
+    }
 
+    public static void clearRegisters() {
+        registerContents = null;
+        locals = null;
+    }
+
+    public static String getRegisterContents(CodeItem codeItem, int register) {
+        if (registerContents != null && registerContents[register] != null) {
+            return registerContents[register];
+        } else {
+            return getRegisterName(codeItem, register);
+        }
+    }
+
+    public static void setRegisterContents(int register, String contents) {
+        registerContents[register] = contents;
+    }
+
+    public static void clearRegisterContents(int register) {
+        registerContents[register] = null;
+    }
+
+    public static boolean isLocal(int register) {
+        return locals[register];
+    }
+
+    public static void setLocal(int register, boolean isLocal) {
+        locals[register] = isLocal;
+    }
+
+    public static String getRegisterName(CodeItem codeItem, int register) {
         if (!baksmali.noParameterRegisters) {
             int parameterRegisterCount = codeItem.getParent().method.getPrototype().getParameterRegisterCount()
-                + (((codeItem.getParent().accessFlags & AccessFlags.STATIC.getValue())==0)?1:0);
+                    + (((codeItem.getParent().accessFlags & AccessFlags.STATIC.getValue()) == 0) ? 1 : 0);
             int registerCount = codeItem.getRegisterCount();
-
-            assert startRegister <= lastRegister;
-
-            if (startRegister >= registerCount - parameterRegisterCount) {
-                writer.write("{p");
-                writer.printSignedIntAsDec(startRegister - (registerCount - parameterRegisterCount));
-                writer.write(" .. p");
-                writer.printSignedIntAsDec(lastRegister - (registerCount - parameterRegisterCount));
-                writer.write('}');
-                return;
+            if (register >= registerCount - parameterRegisterCount) {
+                return 'p' + String.valueOf((register - (registerCount - parameterRegisterCount)));
             }
         }
-        writer.write("{v");
-        writer.printSignedIntAsDec(startRegister);
-        writer.write(" .. v");
-        writer.printSignedIntAsDec(lastRegister);
-        writer.write('}');
+        return 'v' + String.valueOf(register);
+    }
+
+    public static String getRegisterRange(CodeItem codeItem, int startRegister, int lastRegister) {
+        assert lastRegister >= startRegister;
+
+        String range = "(";
+        boolean firstTime = true;
+        for (int register = startRegister; register <= lastRegister; register++) {
+            if (!firstTime) {
+                range += ", ";
+            }
+            firstTime = false;
+            range += getRegisterContents(codeItem, register);
+        }
+        range += ")";
+        return range;
     }
 
     /**
@@ -82,22 +109,27 @@ public class RegisterFormatter {
      * output a register in the v<n> format. If false, then it determines if the register is a parameter register,
      * and if so, formats it in the p<n> format instead.
      *
-     * @param writer the <code>IndentingWriter</code> to write to
+     * @param writer   the <code>IndentingWriter</code> to write to
      * @param codeItem the <code>CodeItem</code> that the register is from
      * @param register the register number
      */
     public static void writeTo(IndentingWriter writer, CodeItem codeItem, int register) throws IOException {
-        if (!baksmali.noParameterRegisters) {
-            int parameterRegisterCount = codeItem.getParent().method.getPrototype().getParameterRegisterCount()
-                    + (((codeItem.getParent().accessFlags & AccessFlags.STATIC.getValue())==0)?1:0);
-            int registerCount = codeItem.getRegisterCount();
-            if (register >= registerCount - parameterRegisterCount) {
-                writer.write('p');
-                writer.printSignedIntAsDec((register - (registerCount - parameterRegisterCount)));
-                return;
-            }
-        }
-        writer.write('v');
-        writer.printSignedIntAsDec(register);
+        writer.write(getRegisterContents(codeItem, register));
+    }
+
+    /**
+     * Write out the register range value used by Format3rc. If baksmali.noParameterRegisters is true, it will always
+     * output the registers in the v<n> format. But if false, then it will check if *both* registers are parameter
+     * registers, and if so, use the p<n> format for both. If only the last register is a parameter register, it will
+     * use the v<n> format for both, otherwise it would be confusing to have something like {v20 .. p1}
+     *
+     * @param writer        the <code>IndentingWriter</code> to write to
+     * @param codeItem      the <code>CodeItem</code> that the register is from
+     * @param startRegister the first register in the range
+     * @param lastRegister  the last register in the range
+     */
+    public static void writeRegisterRange(IndentingWriter writer, CodeItem codeItem, int startRegister,
+                                          int lastRegister) throws IOException {
+        writer.write(getRegisterRange(codeItem, startRegister, lastRegister));
     }
 }
