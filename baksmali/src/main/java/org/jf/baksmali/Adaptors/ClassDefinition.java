@@ -39,6 +39,7 @@ import org.jf.dexlib.Util.SparseArray;
 import org.jf.util.IndentingWriter;
 
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.List;
 
 public class ClassDefinition {
@@ -52,6 +53,8 @@ public class ClassDefinition {
     private SparseArray<FieldIdItem> fieldsSetInStaticConstructor;
 
     protected boolean validationErrors;
+
+    public static HashSet<String> imports = null;
 
     public ClassDefinition(ClassDefItem classDefItem) {
         this.classDefItem = classDefItem;
@@ -139,8 +142,13 @@ public class ClassDefinition {
         }
     }
 
-    public void writeTo(IndentingWriter writer) throws IOException {
-        writePackage(writer);
+    public void writeTo(IndentingWriter unprocessedWriter, IndentingWriter baseWriter) throws IOException {
+        writeUnprocessed(unprocessedWriter);
+        writeBase(baseWriter);
+    }
+
+    private void writeUnprocessed(IndentingWriter writer) throws IOException {
+        imports = new HashSet<String>();
         writeClass(writer);
         writeSuper(writer);
         writeInterfaces(writer);
@@ -155,6 +163,11 @@ public class ClassDefinition {
         writer.write("}");
     }
 
+    private void writeBase(IndentingWriter writer) throws IOException {
+        writePackage(writer);
+        writeImports(writer);
+    }
+
     private void writePackage(IndentingWriter writer) throws IOException {
         writer.write("package ");
         String descriptor = classDefItem.getClassType().getJavaTypeDescriptor();
@@ -162,6 +175,14 @@ public class ClassDefinition {
         writer.write(descriptor.substring(0, lastPeriod));
         writer.write(";\n\n");
 
+    }
+
+    private void writeImports(IndentingWriter writer) throws IOException {
+        for (String anImport : imports) {
+            writer.write(anImport);
+            writer.write(";\n");
+        }
+        writer.write('\n');
     }
 
     private void writeClass(IndentingWriter writer) throws IOException {
@@ -183,6 +204,7 @@ public class ClassDefinition {
         if ((superClass != null) && (!superClass.getTypeDescriptor().equals("Ljava/lang/Object;"))) {
             writer.write(" extends ");
             writer.write(superClass.getShortJavaTypeDescriptor());
+            imports.add(superClass.getJavaTypeDescriptor());
         }
     }
 
@@ -205,6 +227,7 @@ public class ClassDefinition {
             }
             firstTime = false;
             writer.write(typeIdItem.getShortJavaTypeDescriptor());
+            imports.add(typeIdItem.getJavaTypeDescriptor());
         }
     }
 

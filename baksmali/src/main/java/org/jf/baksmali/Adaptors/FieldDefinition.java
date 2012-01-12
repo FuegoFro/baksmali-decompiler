@@ -60,6 +60,7 @@ public class FieldDefinition {
 
         writeAccessFlags(writer, encodedField);
         writer.write(encodedField.field.getFieldType().getShortJavaTypeDescriptor());
+        ClassDefinition.imports.add(encodedField.field.getFieldType().getJavaTypeDescriptor());
         writer.write(' ');
         writer.write(encodedField.field.getFieldName().getStringValue());
         if (initialValue != null) {

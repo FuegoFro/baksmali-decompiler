@@ -62,8 +62,7 @@ public class baksmali {
                                           boolean noParameterRegisters, boolean useLocalsDirective,
                                           boolean useSequentialLabels, boolean outputDebugInfo, boolean addCodeOffsets,
                                           boolean noAccessorComments, int registerInfo, boolean verify,
-                                          boolean ignoreErrors, String inlineTable)
-    {
+                                          boolean ignoreErrors, String inlineTable) {
         baksmali.noParameterRegisters = noParameterRegisters;
         baksmali.useLocalsDirective = useLocalsDirective;
         baksmali.useSequentialLabels = useSequentialLabels;
@@ -99,7 +98,7 @@ public class baksmali {
                     //specify a -c option, we should add framework.jar to the boot class path by default, so that it
                     //"just works"
                     if (extraBootClassPathArray == null && isExtJar(dexFilePath)) {
-                        extraBootClassPathArray = new String[] {"framework.jar"};
+                        extraBootClassPathArray = new String[]{"framework.jar"};
                     }
                     ClassPath.InitializeClassPathFromOdex(classPathDirs, extraBootClassPathArray, dexFilePath, dexFile,
                             classPathErrorHandler);
@@ -145,9 +144,12 @@ public class baksmali {
             }
         });
 
-        ClassFileNameHandler fileNameHandler = new ClassFileNameHandler(outputDirectoryFile, ".java");
+        // Unprocessed needs to be post processed for clearer Java-like code. It is concatenated onto the base in post-processing.
+        ClassFileNameHandler unprocessedFileNameHandler = new ClassFileNameHandler(outputDirectoryFile, ".unprocessed");
+        // Base contains the package and imports
+        ClassFileNameHandler baseFileNameHandler = new ClassFileNameHandler(outputDirectoryFile, ".java");
 
-        for (ClassDefItem classDefItem: classDefItems) {
+        for (ClassDefItem classDefItem : classDefItems) {
             /**
              * The path for the disassembly file is based on the package name
              * The class descriptor will look something like:
@@ -169,21 +171,22 @@ public class baksmali {
 
             //validate that the descriptor is formatted like we expect
             if (classDescriptor.charAt(0) != 'L' ||
-                classDescriptor.charAt(classDescriptor.length()-1) != ';') {
+                    classDescriptor.charAt(classDescriptor.length() - 1) != ';') {
                 System.err.println("Unrecognized class descriptor - " + classDescriptor + " - skipping class");
                 continue;
             }
 
-            File smaliFile = fileNameHandler.getUniqueFilenameForClass(classDescriptor);
+            File unprocessedSmaliFile = unprocessedFileNameHandler.getUniqueFilenameForClass(classDescriptor);
+            File baseSmaliFile = baseFileNameHandler.getUniqueFilenameForClass(classDescriptor);
 
             //create and initialize the top level string template
             ClassDefinition classDefinition = new ClassDefinition(classDefItem);
 
             //write the disassembly
-            Writer writer = null;
-            try
-            {
-                File smaliParent = smaliFile.getParentFile();
+            Writer unprocessedWriter = null;
+            Writer baseWriter = null;
+            try {
+                File smaliParent = unprocessedSmaliFile.getParentFile();
                 if (!smaliParent.exists()) {
                     if (!smaliParent.mkdirs()) {
                         System.err.println("Unable to create directory " + smaliParent.toString() + " - skipping class");
@@ -191,29 +194,47 @@ public class baksmali {
                     }
                 }
 
-                if (!smaliFile.exists()){
-                    if (!smaliFile.createNewFile()) {
-                        System.err.println("Unable to create file " + smaliFile.toString() + " - skipping class");
+                if (!unprocessedSmaliFile.exists()) {
+                    if (!unprocessedSmaliFile.createNewFile()) {
+                        System.err.println("Unable to create file " + unprocessedSmaliFile.toString() + " - skipping class");
                         continue;
                     }
                 }
 
-                BufferedWriter bufWriter = new BufferedWriter(new OutputStreamWriter(
-                        new FileOutputStream(smaliFile), "UTF8"));
+                if (!baseSmaliFile.exists()) {
+                    if (!baseSmaliFile.createNewFile()) {
+                        System.err.println("Unable to create file " + baseSmaliFile.toString() + " - skipping class");
+                        continue;
+                    }
+                }
 
-                writer = new IndentingWriter(bufWriter);
-                classDefinition.writeTo((IndentingWriter)writer);
+                BufferedWriter unprocessedBufWriter = new BufferedWriter(new OutputStreamWriter(
+                        new FileOutputStream(unprocessedSmaliFile), "UTF8"));
+                BufferedWriter baseBufWriter = new BufferedWriter(new OutputStreamWriter(
+                        new FileOutputStream(unprocessedSmaliFile), "UTF8"));
+
+                unprocessedWriter = new IndentingWriter(unprocessedBufWriter);
+
+                baseWriter = new IndentingWriter(baseBufWriter);
+
+                classDefinition.writeTo((IndentingWriter) unprocessedWriter, (IndentingWriter) baseWriter);
             } catch (Exception ex) {
                 System.err.println("\n\nError occured while disassembling class " + classDescriptor.replace('/', '.') + " - skipping class");
                 ex.printStackTrace();
-            }
-            finally
-            {
-                if (writer != null) {
+            } finally {
+                if (unprocessedWriter != null) {
                     try {
-                        writer.close();
+                        unprocessedWriter.close();
                     } catch (Throwable ex) {
-                        System.err.println("\n\nError occured while closing file " + smaliFile.toString());
+                        System.err.println("\n\nError occured while closing file " + unprocessedSmaliFile.toString());
+                        ex.printStackTrace();
+                    }
+                }
+                if (baseWriter != null) {
+                    try {
+                        baseWriter.close();
+                    } catch (Throwable ex) {
+                        System.err.println("\n\nError occured while closing file " + baseWriter.toString());
                         ex.printStackTrace();
                     }
                 }
@@ -226,6 +247,7 @@ public class baksmali {
     }
 
     private static final Pattern extJarPattern = Pattern.compile("(?:^|\\\\|/)ext.(?:jar|odex)$");
+
     private static boolean isExtJar(String dexFilePath) {
         Matcher m = extJarPattern.matcher(dexFilePath);
         return m.find();
