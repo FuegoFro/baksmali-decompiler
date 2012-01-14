@@ -49,12 +49,13 @@ public class ReferenceFormatter {
         return "";
     }
 
-    public static String getMethodReference(MethodIdItem item, boolean includeClassName) {
+    public static String getMethodReference(MethodIdItem item, boolean isStaticReference) {
         String methodName = item.getMethodName().getStringValue();
         String descriptor = item.getContainingClass().getShortJavaTypeDescriptor();
         if (methodName.equals("<init>") || methodName.equals("<clinit>")) {
             return descriptor;
-        } else if (includeClassName) {
+        } else if (isStaticReference) {
+            ClassDefinition.addImport(item.getContainingClass().getJavaTypeDescriptor());
             return descriptor + "." + methodName;
         }
         return methodName;
