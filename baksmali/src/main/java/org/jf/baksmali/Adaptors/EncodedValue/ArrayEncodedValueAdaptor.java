@@ -36,6 +36,7 @@ import java.io.IOException;
 
 public class ArrayEncodedValueAdaptor {
     public static void writeTo(IndentingWriter writer, ArrayEncodedValue encodedArray) throws IOException {
+        writer.write("//");
         writer.write('{');
         EncodedValue[] values = encodedArray.values;
         if (values == null || values.length == 0) {
@@ -51,10 +52,10 @@ public class ArrayEncodedValueAdaptor {
                 writer.write(",\n");
             }
             first = false;
-
+            writer.write("//");
             EncodedValueAdaptor.writeTo(writer, encodedValue);
         }
         writer.deindent(4);
-        writer.write("\n}");
+        writer.write("\n//}");
     }
 }

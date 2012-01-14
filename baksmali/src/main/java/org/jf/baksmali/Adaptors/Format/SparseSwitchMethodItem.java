@@ -78,16 +78,17 @@ public class SparseSwitchMethodItem extends InstructionMethodItem<SparseSwitchDa
 
     @Override
     public boolean writeTo(IndentingWriter writer) throws IOException {
-        writer.write(".sparse-switch\n");
+        writer.write("//.sparse-switch\n");
         writer.indent(4);
         for (SparseSwitchTarget target: targets) {
+            writer.write("//");
             IntegerRenderer.writeTo(writer, target.Key);
             writer.write(" -> ");
             target.writeTargetTo(writer);
             writer.write('\n');
         }
         writer.deindent(4);
-        writer.write(".end sparse-switch");
+        writer.write("//.end sparse-switch");
         return true;
     }
 

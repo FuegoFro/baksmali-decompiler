@@ -51,7 +51,7 @@ public class AnnotationFormatter {
     }
 
     public static void writeTo(IndentingWriter writer, AnnotationItem annotationItem) throws IOException {
-        writer.write(".annotation ");
+        writer.write("//.annotation ");
         writer.write(annotationItem.getVisibility().visibility);
         writer.write(' ');
         ReferenceFormatter.writeTypeReference(writer, annotationItem.getEncodedAnnotation().annotationType);
@@ -59,6 +59,6 @@ public class AnnotationFormatter {
 
         AnnotationEncodedValueAdaptor.writeElementsTo(writer, annotationItem.getEncodedAnnotation());
 
-        writer.write(".end annotation\n");
+        writer.write("//.end annotation\n");
     }
 }

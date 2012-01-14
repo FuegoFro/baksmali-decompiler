@@ -36,6 +36,7 @@ import java.io.IOException;
 
 public class EnumEncodedValueAdaptor {
     public static void writeTo(IndentingWriter writer, FieldIdItem item) throws IOException {
+        writer.write("//");
         writer.write(".enum ");
         ReferenceFormatter.writeFieldReference(writer, item);
     }

@@ -38,18 +38,19 @@ public abstract class AnnotationEncodedValueAdaptor {
 
     public static void writeTo(IndentingWriter writer, AnnotationEncodedSubValue encodedAnnotation)
                                throws IOException {
-        writer.write(".subannotation ");
+        writer.write("//.subannotation ");
         ReferenceFormatter.writeTypeReference(writer, encodedAnnotation.annotationType);
         writer.write('\n');
 
         writeElementsTo(writer, encodedAnnotation);
-        writer.write(".end subannotation");
+        writer.write("//.end subannotation");
     }
 
     public static void writeElementsTo(IndentingWriter writer, AnnotationEncodedSubValue encodedAnnotation)
                                 throws IOException {
         writer.indent(4);
         for (int i=0; i<encodedAnnotation.names.length; i++) {
+            writer.write("//");
             writer.write(encodedAnnotation.names[i].getStringValue());
             writer.write(" = ");
 

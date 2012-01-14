@@ -78,9 +78,9 @@ public class CatchMethodItem extends MethodItem {
     @Override
     public boolean writeTo(IndentingWriter writer) throws IOException {
         if (exceptionType == null) {
-            writer.write(".catchall");
+            writer.write("//.catchall");
         } else {
-            writer.write(".catch ");
+            writer.write("//.catch ");
             ReferenceFormatter.writeTypeReference(writer, exceptionType);
         }
         writer.write(" {");

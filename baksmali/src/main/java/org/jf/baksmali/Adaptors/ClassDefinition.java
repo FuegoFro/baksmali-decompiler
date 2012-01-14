@@ -257,7 +257,7 @@ public class ClassDefinition {
         }
 
         writer.write("\n\n");
-        writer.write("# annotations\n");
+        writer.write("// annotations\n");
         AnnotationFormatter.writeTo(writer, annotationSet);
     }
 

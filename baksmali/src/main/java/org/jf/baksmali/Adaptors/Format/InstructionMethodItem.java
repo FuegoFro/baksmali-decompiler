@@ -101,6 +101,7 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
             setFirstRegisterContents(writer, getReference());
         } else if (value >= 0x01d && value <= 0x01e) { //monitor
             // Todo: Skipped monitor opcodes
+            writer.write("//");
             writeOpcode(writer);
             writer.write(' ');
             writeFirstRegister(writer);
@@ -152,6 +153,7 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
             writer.write("\n\n");
         } else if (value >= 0x02b && value <= 0x02c) {
             // Todo: Skipped packed and sparse switch opcodes
+            writer.write("//");
             writeOpcode(writer);
             writer.write(' ');
             writeFirstRegister(writer);
@@ -159,6 +161,7 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
             writeTargetLabel(writer);
         } else if (value >= 0x02d && value <= 0x031) {
             // Todo: Skipped compares
+            writer.write("//");
             writeOpcode(writer);
             writer.write(' ');
             writeFirstRegister(writer);

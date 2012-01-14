@@ -55,7 +55,7 @@ public class FieldDefinition {
                 initialValue != NullEncodedValue.NullValue
             )) {
 
-            writer.write("#the value of this static final field might be set in the static constructor\n");
+            writer.write("//the value of this static final field might be set in the static constructor\n");
         }
 
         writeAccessFlags(writer, encodedField);
@@ -74,7 +74,7 @@ public class FieldDefinition {
             writer.indent(4);
             AnnotationFormatter.writeTo(writer, annotationSet);
             writer.deindent(4);
-            writer.write(".end field\n");
+            writer.write("//end field\n");
         }
     }
 
