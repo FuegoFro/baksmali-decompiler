@@ -4,15 +4,22 @@ rm -rf '/home/danny/workspace/decompiled/by-hand/baksmali/classes/org/jf/baksmal
 cp -r '/home/danny/workspace/baksmali-smali/baksmali/target/classes/org/jf/baksmali' '/home/danny/workspace/decompiled/by-hand/baksmali/classes/org/jf/baksmali'
 
 echo "Decompiling dex file..."
+
+frameworkDir=/home/danny/Desktop/java-framework/java
+if [ ! -d "$frameworkDir" ]; then
+    mkdir "$frameworkDir"
+fi
+
 cd '/home/danny/workspace/decompiled/by-hand/baksmali/classes'
-java -cp .:~/.m2/repository/commons-cli/commons-cli/1.2/commons-cli-1.2.jar org.jf.baksmali.main -a 10 -o '/home/danny/workspace/decompiled/by-hand/framework2' '/home/danny/workspace/decompiled/gummy/classes.dex'
+java -cp .:~/.m2/repository/commons-cli/commons-cli/1.2/commons-cli-1.2.jar org.jf.baksmali.main -a 10 -o "$frameworkDir" '/home/danny/workspace/decompiled/gummy/classes.dex'
 
 echo "Postprocessing source files..."
-cd "/home/danny/workspace/decompiled/by-hand/framework2"
-for file in `find .`; do
-    if [ -f "$file" ]; then
-        perl -i -p -e 's/^[ ]*;\n//g;
-                       s/new StringBuilder\(\)\.append\((.*)\)\.toString\(\)/\1/g;
-                       s/\)\.append\(/ \+ /g' "$file"
-    fi
+cd "$frameworkDir"
+for file in `find . -name *.java`; do
+    unprocessed="${file%.java}.unprocessed"
+    cat "$unprocessed" >> "$file"
+    perl -i -p -e 's/^[ ]*;\n//g;
+                   s/new StringBuilder\(\)\.append\((.*)\)\.toString\(\)/\1/g;
+                   s/\)\.append\(/ \+ /g' "$file"
+    rm "$unprocessed"
 done

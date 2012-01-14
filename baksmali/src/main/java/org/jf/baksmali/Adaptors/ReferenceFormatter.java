@@ -69,7 +69,7 @@ public class ReferenceFormatter {
     }
 
     public static String getTypeReference(TypeIdItem item) {
-        ClassDefinition.imports.add(item.getJavaTypeDescriptor());
+        ClassDefinition.addImport(item.getJavaTypeDescriptor());
         return item.getShortJavaTypeDescriptor();
     }
 

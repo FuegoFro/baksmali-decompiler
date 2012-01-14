@@ -211,10 +211,9 @@ public class baksmali {
                 BufferedWriter unprocessedBufWriter = new BufferedWriter(new OutputStreamWriter(
                         new FileOutputStream(unprocessedSmaliFile), "UTF8"));
                 BufferedWriter baseBufWriter = new BufferedWriter(new OutputStreamWriter(
-                        new FileOutputStream(unprocessedSmaliFile), "UTF8"));
+                        new FileOutputStream(baseSmaliFile), "UTF8"));
 
                 unprocessedWriter = new IndentingWriter(unprocessedBufWriter);
-
                 baseWriter = new IndentingWriter(baseBufWriter);
 
                 classDefinition.writeTo((IndentingWriter) unprocessedWriter, (IndentingWriter) baseWriter);

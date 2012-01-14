@@ -119,7 +119,7 @@ public class MethodDefinition {
             writer.write(encodedMethod.method.getContainingClass().getShortJavaTypeDescriptor());
         } else {
             writer.write(encodedMethod.method.getPrototype().getReturnType().getShortJavaTypeDescriptor());
-            ClassDefinition.imports.add(encodedMethod.method.getPrototype().getReturnType().getJavaTypeDescriptor());
+            ClassDefinition.addImport(encodedMethod.method.getPrototype().getReturnType().getJavaTypeDescriptor());
             writer.write(' ');
             writer.write(encodedMethod.method.getMethodName().getStringValue());
         }
@@ -164,7 +164,7 @@ public class MethodDefinition {
             }
             firstTime = false;
             writer.write(parameterTypes.get(i).getShortJavaTypeDescriptor());
-            ClassDefinition.imports.add(parameterTypes.get(i).getJavaTypeDescriptor());
+            ClassDefinition.addImport(parameterTypes.get(i).getJavaTypeDescriptor());
             writer.write(' ');
             if (firstParameter >= 0) {
                 RegisterFormatter.writeTo(writer, encodedMethod.codeItem, firstParameter + i);

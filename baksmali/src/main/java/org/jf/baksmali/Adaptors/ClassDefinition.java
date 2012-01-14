@@ -54,7 +54,8 @@ public class ClassDefinition {
 
     protected boolean validationErrors;
 
-    public static HashSet<String> imports = null;
+    private static HashSet<String> imports = null;
+    private boolean isInterface;
 
     public ClassDefinition(ClassDefItem classDefItem) {
         this.classDefItem = classDefItem;
@@ -93,11 +94,11 @@ public class ClassDefinition {
         parameterAnnotationsMap = new SparseArray<AnnotationSetRefList>(
                 annotationDirectory.getParameterAnnotationCount());
         annotationDirectory.iterateParameterAnnotations(
-          new AnnotationDirectoryItem.ParameterAnnotationIteratorDelegate() {
-            public void processParameterAnnotations(MethodIdItem method, AnnotationSetRefList parameterAnnotations) {
-                parameterAnnotationsMap.put(method.getIndex(), parameterAnnotations);
-            }
-        });
+                new AnnotationDirectoryItem.ParameterAnnotationIteratorDelegate() {
+                    public void processParameterAnnotations(MethodIdItem method, AnnotationSetRefList parameterAnnotations) {
+                        parameterAnnotationsMap.put(method.getIndex(), parameterAnnotations);
+                    }
+                });
     }
 
     private void findFieldsSetInStaticConstructor() {
@@ -107,10 +108,10 @@ public class ClassDefinition {
             return;
         }
 
-        for (ClassDataItem.EncodedMethod directMethod: classDataItem.getDirectMethods()) {
+        for (ClassDataItem.EncodedMethod directMethod : classDataItem.getDirectMethods()) {
             if (directMethod.method.getMethodName().getStringValue().equals("<clinit>") &&
                     directMethod.codeItem != null) {
-                for (Instruction instruction: directMethod.codeItem.getInstructions()) {
+                for (Instruction instruction : directMethod.codeItem.getInstructions()) {
                     switch (instruction.opcode) {
                         case SPUT:
                         case SPUT_BOOLEAN:
@@ -119,8 +120,8 @@ public class ClassDefinition {
                         case SPUT_OBJECT:
                         case SPUT_SHORT:
                         case SPUT_WIDE: {
-                            Instruction21c ins = (Instruction21c)instruction;
-                            FieldIdItem fieldIdItem = (FieldIdItem)ins.getReferencedItem();
+                            Instruction21c ins = (Instruction21c) instruction;
+                            FieldIdItem fieldIdItem = (FieldIdItem) ins.getReferencedItem();
                             fieldsSetInStaticConstructor.put(fieldIdItem.getIndex(), fieldIdItem);
                             break;
                         }
@@ -131,14 +132,21 @@ public class ClassDefinition {
                         case SPUT_OBJECT_JUMBO:
                         case SPUT_SHORT_JUMBO:
                         case SPUT_WIDE_JUMBO: {
-                            Instruction41c ins = (Instruction41c)instruction;
-                            FieldIdItem fieldIdItem = (FieldIdItem)ins.getReferencedItem();
+                            Instruction41c ins = (Instruction41c) instruction;
+                            FieldIdItem fieldIdItem = (FieldIdItem) ins.getReferencedItem();
                             fieldsSetInStaticConstructor.put(fieldIdItem.getIndex(), fieldIdItem);
                             break;
                         }
                     }
                 }
             }
+        }
+    }
+
+    public static void addImport(String newImport) {
+        newImport = newImport.replace("[]", "");
+        if (newImport.indexOf('.') >= 0 && !newImport.startsWith("dalvik")) {
+            imports.add(newImport);
         }
     }
 
@@ -179,6 +187,7 @@ public class ClassDefinition {
 
     private void writeImports(IndentingWriter writer) throws IOException {
         for (String anImport : imports) {
+            writer.write("import ");
             writer.write(anImport);
             writer.write(";\n");
         }
@@ -187,15 +196,20 @@ public class ClassDefinition {
 
     private void writeClass(IndentingWriter writer) throws IOException {
         writeAccessFlags(writer);
-        writer.write("class ");
+        if (!isInterface) {
+            writer.write("class ");
+        }
         String descriptor = classDefItem.getClassType().getShortJavaTypeDescriptor();
         writer.write(descriptor);
     }
 
     private void writeAccessFlags(IndentingWriter writer) throws IOException {
-        for (AccessFlags accessFlag: AccessFlags.getAccessFlagsForClass(classDefItem.getAccessFlags())) {
-            writer.write(accessFlag.toString());
-            writer.write(' ');
+        isInterface = (classDefItem.getAccessFlags() & AccessFlags.INTERFACE.getValue()) != 0;
+        for (AccessFlags accessFlag : AccessFlags.getAccessFlagsForClass(classDefItem.getAccessFlags())) {
+            if (!(isInterface && accessFlag.equals(AccessFlags.ABSTRACT))) {
+                writer.write(accessFlag.toString());
+                writer.write(' ');
+            }
         }
     }
 
@@ -204,7 +218,7 @@ public class ClassDefinition {
         if ((superClass != null) && (!superClass.getTypeDescriptor().equals("Ljava/lang/Object;"))) {
             writer.write(" extends ");
             writer.write(superClass.getShortJavaTypeDescriptor());
-            imports.add(superClass.getJavaTypeDescriptor());
+            addImport(superClass.getJavaTypeDescriptor());
         }
     }
 
@@ -221,13 +235,13 @@ public class ClassDefinition {
 
         writer.write(" implements ");
         boolean firstTime = true;
-        for (TypeIdItem typeIdItem: interfaceList.getTypes()) {
+        for (TypeIdItem typeIdItem : interfaceList.getTypes()) {
             if (!firstTime) {
                 writer.write(", ");
             }
             firstTime = false;
             writer.write(typeIdItem.getShortJavaTypeDescriptor());
-            imports.add(typeIdItem.getJavaTypeDescriptor());
+            addImport(typeIdItem.getJavaTypeDescriptor());
         }
     }
 
@@ -252,7 +266,7 @@ public class ClassDefinition {
             return;
         }
         //if classDataItem is not null, then classDefItem won't be null either
-        assert(classDefItem != null);
+        assert (classDefItem != null);
 
         EncodedArrayItem encodedStaticInitializers = classDefItem.getStaticFieldInitializers();
 
@@ -271,7 +285,7 @@ public class ClassDefinition {
         writer.write("\n\n");
 
         boolean first = true;
-        for (int i=0; i<encodedFields.length; i++) {
+        for (int i = 0; i < encodedFields.length; i++) {
             if (!first) {
                 writer.write('\n');
             }
@@ -303,7 +317,7 @@ public class ClassDefinition {
 
         writer.write("\n\n");
         boolean first = true;
-        for (ClassDataItem.EncodedField field: classDataItem.getInstanceFields()) {
+        for (ClassDataItem.EncodedField field : classDataItem.getInstanceFields()) {
             if (!first) {
                 writer.write('\n');
             }
@@ -349,7 +363,7 @@ public class ClassDefinition {
 
     private void writeMethods(IndentingWriter writer, ClassDataItem.EncodedMethod[] methods) throws IOException {
         boolean first = true;
-        for (ClassDataItem.EncodedMethod method: methods) {
+        for (ClassDataItem.EncodedMethod method : methods) {
             if (!first) {
                 writer.write('\n');
             }
