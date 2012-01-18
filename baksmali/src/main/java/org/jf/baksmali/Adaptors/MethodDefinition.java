@@ -129,7 +129,7 @@ public class MethodDefinition {
             writer.write(encodedMethod.method.getMethodName().getStringValue());
         }
         writeSignature(writer);
-        writer.write(" {\n");
+        writer.write(" {");
 
         writer.indent(4);
         if (codeItem != null) {

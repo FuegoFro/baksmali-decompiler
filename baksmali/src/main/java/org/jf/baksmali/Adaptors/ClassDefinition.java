@@ -165,7 +165,7 @@ public class ClassDefinition {
         writeClass(writer);
         writeSuper(writer);
         writeInterfaces(writer);
-        writer.write(" {\n");
+        writer.write(" {");
         writer.indent(4);
         writeAnnotations(writer);
         writeStaticFields(writer);
