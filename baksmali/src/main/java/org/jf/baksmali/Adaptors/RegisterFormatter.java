@@ -65,7 +65,9 @@ public class RegisterFormatter {
     }
 
     public static void clearRegisterContents(int register) {
-        registerContents[register] = null;
+        if (!isLocal(register)) {
+            registerContents[register] = null;
+        }
     }
 
     public static boolean isLocal(int register) {
