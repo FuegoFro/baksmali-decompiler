@@ -229,7 +229,7 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
             writeReference(writer);
             writeEquals(writer);
             writeFirstRegister(writer);
-        } else if (value >= 0x06e && value <= 0x072 && value != 0x071) { //invoke non-static
+        } else if (value >= 0x06e && value <= 0x072 && value != 0x06f && value != 0x071) { //invoke non-static
             String methodName = ((MethodIdItem) (((InstructionWithReference) instruction).getReferencedItem())).getMethodName().getStringValue();
             String instance = getInstance();
             if (methodName.equals("<init>") && !instance.equals("this")) {
@@ -240,15 +240,19 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
                     previousMethodCall = instance + "." + previousMethodCall;
                 }
             }
+        } else if (value == 0x06f) {
+            previousMethodCall = "super." + getReference() + getInvocation();
         } else if (value == 0x071) { //invoke static
             previousMethodCall = getStaticReference() + getStaticInvocation();
-        } else if (value >= 0x074 && value <= 0x078 && value != 77) { // invoke-range non-static
+        } else if (value >= 0x074 && value <= 0x078 && value != 0x075 && value != 0x077) { // invoke-range non-static
             String instance = getRangeInstance();
             previousMethodCall = getReference() + getRangeInvocation();
             if (!instance.equals("this")) {
                 previousMethodCall = instance + "." + previousMethodCall;
             }
-        } else if (value == 77) { // invoke-range static
+        } else if (value == 0x075) {
+            previousMethodCall = "super." + getReference() + getRangeInvocation();
+        } else if (value == 0x077) { // invoke-range static
             previousMethodCall = getStaticReference() + getStaticRangeInvocation();
         } else if (value >= 0x07b && value <= 0x08f) { //conversions
             setFirstRegisterContents(writer, getOpcode() + getSecondRegisterContents());

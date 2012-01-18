@@ -6,9 +6,10 @@ cp -r '/home/danny/workspace/baksmali-smali/baksmali/target/classes/org/jf/baksm
 echo "Decompiling dex file..."
 
 frameworkDir=/home/danny/Desktop/java-framework/java
-if [ ! -d "$frameworkDir" ]; then
-    mkdir "$frameworkDir"
+if [ -d "$frameworkDir" ]; then
+    rm -rf "$frameworkDir"
 fi
+mkdir "$frameworkDir"
 
 cd '/home/danny/workspace/decompiled/by-hand/baksmali/classes'
 java -cp .:~/.m2/repository/commons-cli/commons-cli/1.2/commons-cli-1.2.jar org.jf.baksmali.main -a 10 -o "$frameworkDir" '/home/danny/workspace/decompiled/gummy/classes.dex'
