@@ -107,6 +107,11 @@ public class MethodDefinition {
                         AnnotationSetRefList parameterAnnotations) throws IOException {
         final CodeItem codeItem = encodedMethod.codeItem;
 
+        //don't print synthetic fields
+        if ((encodedMethod.accessFlags & AccessFlags.SYNTHETIC.getValue()) != 0) {
+            return;
+        }
+
         if (codeItem != null) {
             RegisterFormatter.newRegisterSet(getRegisterCount(encodedMethod));
             writeParameters(writer, codeItem, parameterAnnotations);

@@ -43,17 +43,22 @@ public class FieldDefinition {
                                                 EncodedValue initialValue, AnnotationSetItem annotationSet,
                                                 boolean setInStaticConstructor) throws IOException {
 
+        //don't print synthetic fields
+        if ((encodedField.accessFlags & AccessFlags.SYNTHETIC.getValue()) != 0) {
+            return;
+        }
+
         String fieldTypeDescriptor = encodedField.field.getFieldType().getTypeDescriptor();
 
         if (setInStaticConstructor &&
-            encodedField.isStatic() &&
-            (encodedField.accessFlags & AccessFlags.FINAL.getValue()) != 0 &&
-            initialValue != null &&
-            (
-                //it's a primitive type, or it's an array/reference type and the initial value isn't null
-                fieldTypeDescriptor.length() == 1 ||
-                initialValue != NullEncodedValue.NullValue
-            )) {
+                encodedField.isStatic() &&
+                (encodedField.accessFlags & AccessFlags.FINAL.getValue()) != 0 &&
+                initialValue != null &&
+                (
+                        //it's a primitive type, or it's an array/reference type and the initial value isn't null
+                        fieldTypeDescriptor.length() == 1 ||
+                                initialValue != NullEncodedValue.NullValue
+                )) {
 
             writer.write("//the value of this static final field might be set in the static constructor\n");
         }

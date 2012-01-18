@@ -30,8 +30,12 @@ package org.jf.baksmali;
 
 import org.jf.baksmali.Adaptors.ClassDefinition;
 import org.jf.dexlib.ClassDefItem;
-import org.jf.dexlib.Code.Analysis.*;
+import org.jf.dexlib.Code.Analysis.ClassPath;
+import org.jf.dexlib.Code.Analysis.CustomInlineMethodResolver;
+import org.jf.dexlib.Code.Analysis.InlineMethodResolver;
+import org.jf.dexlib.Code.Analysis.SyntheticAccessorResolver;
 import org.jf.dexlib.DexFile;
+import org.jf.dexlib.Util.AccessFlags;
 import org.jf.util.ClassFileNameHandler;
 import org.jf.util.IndentingWriter;
 
@@ -168,6 +172,11 @@ public class baksmali {
             }
 
             String classDescriptor = classDefItem.getClassType().getTypeDescriptor();
+
+            //don't print synthetic classes
+            if ((classDefItem.getAccessFlags() & AccessFlags.SYNTHETIC.getValue()) != 0) {
+                continue;
+            }
 
             //validate that the descriptor is formatted like we expect
             if (classDescriptor.charAt(0) != 'L' ||
