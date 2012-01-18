@@ -75,6 +75,12 @@ public class ReferenceFormatter {
         return item.getShortJavaTypeDescriptor();
     }
 
+    public static String getFullTypeReference(TypeIdItem item) {
+        String descriptor = item.getJavaTypeDescriptor();
+        ClassDefinition.addImport(descriptor);
+        return descriptor;
+    }
+
     public static void writeReference(IndentingWriter writer, Item item) throws IOException {
         writer.write(getReference(item, false));
     }

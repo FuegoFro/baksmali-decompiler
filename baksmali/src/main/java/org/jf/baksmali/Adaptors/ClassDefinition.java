@@ -56,6 +56,7 @@ public class ClassDefinition {
 
     private static HashSet<String> imports = null;
     private boolean isInterface;
+    private static String superClass = "";
 
     public ClassDefinition(ClassDefItem classDefItem) {
         this.classDefItem = classDefItem;
@@ -150,6 +151,10 @@ public class ClassDefinition {
         }
     }
 
+    public static boolean isSuper(String classDescription) {
+        return superClass.equals(classDescription);
+    }
+
     public void writeTo(IndentingWriter unprocessedWriter, IndentingWriter baseWriter) throws IOException {
         writeUnprocessed(unprocessedWriter);
         writeBase(baseWriter);
@@ -215,10 +220,13 @@ public class ClassDefinition {
 
     private void writeSuper(IndentingWriter writer) throws IOException {
         TypeIdItem superClass = classDefItem.getSuperclass();
-        if ((superClass != null) && (!superClass.getTypeDescriptor().equals("Ljava/lang/Object;"))) {
-            writer.write(" extends ");
-            writer.write(superClass.getShortJavaTypeDescriptor());
-            addImport(superClass.getJavaTypeDescriptor());
+        if (superClass != null) {
+            ClassDefinition.superClass = superClass.getJavaTypeDescriptor();
+            if (!superClass.getTypeDescriptor().equals("Ljava/lang/Object;")) {
+                writer.write(" extends ");
+                writer.write(superClass.getShortJavaTypeDescriptor());
+                addImport(superClass.getJavaTypeDescriptor());
+            }
         }
     }
 

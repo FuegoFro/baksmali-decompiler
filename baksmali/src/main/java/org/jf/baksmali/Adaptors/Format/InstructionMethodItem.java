@@ -28,6 +28,7 @@
 
 package org.jf.baksmali.Adaptors.Format;
 
+import org.jf.baksmali.Adaptors.ClassDefinition;
 import org.jf.baksmali.Adaptors.MethodItem;
 import org.jf.baksmali.Adaptors.ReferenceFormatter;
 import org.jf.baksmali.Adaptors.RegisterFormatter;
@@ -229,28 +230,15 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
             writeReference(writer);
             writeEquals(writer);
             writeFirstRegister(writer);
-        } else if (value >= 0x06e && value <= 0x072 && value != 0x06f && value != 0x071) { //invoke non-static
-            String methodName = ((MethodIdItem) (((InstructionWithReference) instruction).getReferencedItem())).getMethodName().getStringValue();
-            String instance = getInstance();
-            if (methodName.equals("<init>") && !instance.equals("this")) {
-                setRegisterContents(writer, getInstanceRegister(), "new " + getReference() + getInvocation());
-            } else {
-                previousMethodCall = getReference() + getInvocation();
-                if (!instance.equals("this")) {
-                    previousMethodCall = instance + "." + previousMethodCall;
-                }
-            }
-        } else if (value == 0x06f) {
+        } else if (value >= 0x06e && value <= 0x072 && value != 0x06f && value != 0x071) { //invoke non-super non-static
+            invoke(writer, false);
+        } else if (value == 0x06f) { //invoke super
             previousMethodCall = "super." + getReference() + getInvocation();
         } else if (value == 0x071) { //invoke static
             previousMethodCall = getStaticReference() + getStaticInvocation();
-        } else if (value >= 0x074 && value <= 0x078 && value != 0x075 && value != 0x077) { // invoke-range non-static
-            String instance = getRangeInstance();
-            previousMethodCall = getReference() + getRangeInvocation();
-            if (!instance.equals("this")) {
-                previousMethodCall = instance + "." + previousMethodCall;
-            }
-        } else if (value == 0x075) {
+        } else if (value >= 0x074 && value <= 0x078 && value != 0x075 && value != 0x077) { // invoke-range non-super non-static
+           invoke(writer, true);
+        } else if (value == 0x075) { //invoke-range super
             previousMethodCall = "super." + getReference() + getRangeInvocation();
         } else if (value == 0x077) { // invoke-range static
             previousMethodCall = getStaticReference() + getStaticRangeInvocation();
@@ -267,6 +255,43 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
             return false;
         }
         return true;
+    }
+
+    private void invoke(IndentingWriter writer, boolean isRange) throws IOException {
+        String instance;
+        int instanceRegister;
+        String invocation;
+        if (isRange) {
+            instance = getRangeInstance();
+            instanceRegister = getRangeInstanceRegister();
+            invocation = getRangeInvocation();
+        } else {
+            instance = getInstance();
+            instanceRegister = getInstanceRegister();
+            invocation = getInvocation();
+        }
+
+        if (isConstructor()) {
+            if (ClassDefinition.isSuper(getCalledMethodContainingClass())) {
+                if (!invocation.equals("()")) {
+                    previousMethodCall = "super" + invocation;
+                }
+            } else if (instance.equals("this")) {
+                previousMethodCall = "this" + invocation;
+            } else {
+                setRegisterContents(writer, instanceRegister, "new " + getReference() + invocation);
+            }
+        } else {
+            previousMethodCall = getReference() + invocation;
+            if (!instance.equals("this")) {
+                previousMethodCall = instance + "." + previousMethodCall;
+            }
+        }
+    }
+
+    private boolean isConstructor() {
+        String methodName = ((MethodIdItem) (((InstructionWithReference) instruction).getReferencedItem())).getMethodName().getStringValue();
+        return methodName.equals("<init>");
     }
 
     private void writeEquals(IndentingWriter writer) throws IOException {
@@ -393,6 +418,11 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
         return ReferenceFormatter.getReference(((InstructionWithReference) instruction).getReferencedItem(), false);
     }
 
+    private String getCalledMethodContainingClass() {
+        MethodIdItem item = (MethodIdItem) ((InstructionWithReference) instruction).getReferencedItem();
+        return item.getContainingClass().getJavaTypeDescriptor();
+    }
+
     protected String getStaticReference() {
         return ReferenceFormatter.getReference(((InstructionWithReference) instruction).getReferencedItem(), true);
     }
@@ -510,6 +540,11 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
     private String getInstance() throws IOException {
         FiveRegisterInstruction instruction = (FiveRegisterInstruction) this.instruction;
         return RegisterFormatter.getRegisterContents(codeItem, instruction.getRegisterD());
+    }
+
+    private int getRangeInstanceRegister() throws IOException {
+        RegisterRangeInstruction instruction = (RegisterRangeInstruction) this.instruction;
+        return instruction.getStartRegister();
     }
 
     private String getRangeInstance() throws IOException {
