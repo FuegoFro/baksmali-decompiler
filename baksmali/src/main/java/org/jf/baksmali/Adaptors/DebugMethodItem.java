@@ -58,6 +58,7 @@ public abstract class DebugMethodItem extends MethodItem {
             writer.write(signatureValue);
             wroteSignature = true;
         } else {
+            ClassDefinition.addImport(type.getJavaTypeDescriptor());
             writer.write(type.getShortJavaTypeDescriptor());
         }
         writer.write(' ');

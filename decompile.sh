@@ -17,9 +17,9 @@ echo "Postprocessing source files..."
 cd "$frameworkDir"
 for file in `find . -name *.java`; do
     unprocessed="${file%.java}.unprocessed"
-    cat "$unprocessed" >> "$file"
+    cat "$unprocessed" |
     perl -i -p -e 's/^[ ]*;\n//g;
                    s/new StringBuilder\(\)\.append\((.*)\)\.toString\(\)/\1/g;
-                   s/\)\.append\(/ \+ /g' "$file"
+                   s/\)\.append\(/ \+ /g' >> "$file"
     rm "$unprocessed"
 done

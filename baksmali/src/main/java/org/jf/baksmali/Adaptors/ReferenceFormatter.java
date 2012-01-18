@@ -53,6 +53,7 @@ public class ReferenceFormatter {
         String methodName = item.getMethodName().getStringValue();
         String descriptor = item.getContainingClass().getShortJavaTypeDescriptor();
         if (methodName.equals("<init>") || methodName.equals("<clinit>")) {
+            ClassDefinition.addImport(item.getContainingClass().getJavaTypeDescriptor());
             return descriptor;
         } else if (isStaticReference) {
             ClassDefinition.addImport(item.getContainingClass().getJavaTypeDescriptor());
