@@ -29,22 +29,22 @@
 package org.jf.baksmali.Adaptors;
 
 import org.jf.baksmali.Adaptors.Format.InstructionMethodItemFactory;
-import org.jf.dexlib.Code.Analysis.SyntheticAccessorResolver;
-import org.jf.dexlib.Code.InstructionWithReference;
-import org.jf.util.IndentingWriter;
 import org.jf.baksmali.baksmali;
 import org.jf.dexlib.*;
 import org.jf.dexlib.Code.Analysis.AnalyzedInstruction;
 import org.jf.dexlib.Code.Analysis.MethodAnalyzer;
+import org.jf.dexlib.Code.Analysis.SyntheticAccessorResolver;
 import org.jf.dexlib.Code.Analysis.ValidationException;
 import org.jf.dexlib.Code.Format.Format;
 import org.jf.dexlib.Code.Instruction;
+import org.jf.dexlib.Code.InstructionWithReference;
 import org.jf.dexlib.Code.OffsetInstruction;
 import org.jf.dexlib.Code.Opcode;
 import org.jf.dexlib.Debug.DebugInstructionIterator;
 import org.jf.dexlib.Util.AccessFlags;
 import org.jf.dexlib.Util.ExceptionWithContext;
 import org.jf.dexlib.Util.SparseIntArray;
+import org.jf.util.IndentingWriter;
 
 import java.io.IOException;
 import java.util.*;
@@ -52,6 +52,8 @@ import java.util.*;
 public class MethodDefinition {
     private final ClassDataItem.EncodedMethod encodedMethod;
     private MethodAnalyzer methodAnalyzer;
+
+    private static List<String> parameterTypes = null;
 
     private final LabelCache labelCache = new LabelCache();
 
@@ -103,6 +105,21 @@ public class MethodDefinition {
         }
     }
 
+    private List<String> getParameterTypes() {
+        if (parameterTypes == null) {
+            List<TypeIdItem> typeIdItems = encodedMethod.method.getPrototype().getParameterTypes();
+            parameterTypes = new ArrayList<String>(typeIdItems.size());
+            for (TypeIdItem typeIdItem : typeIdItems) {
+                parameterTypes.add(TypeFormatter.getType(typeIdItem));
+            }
+        }
+        return parameterTypes;
+    }
+
+    public static void setParameterTypes(List<String> parameterTypes) {
+        MethodDefinition.parameterTypes = parameterTypes;
+    }
+
     public void writeTo(IndentingWriter writer, AnnotationSetItem annotationSet,
                         AnnotationSetRefList parameterAnnotations) throws IOException {
         final CodeItem codeItem = encodedMethod.codeItem;
@@ -121,10 +138,11 @@ public class MethodDefinition {
 
         writeAccessFlags(writer, encodedMethod);
         if ((encodedMethod.accessFlags & AccessFlags.CONSTRUCTOR.getValue()) != 0) {
-            writer.write(encodedMethod.method.getContainingClass().getShortJavaTypeDescriptor());
+            writer.write(TypeFormatter.getType(encodedMethod.method.getContainingClass()));
         } else {
-            writer.write(encodedMethod.method.getPrototype().getReturnType().getShortJavaTypeDescriptor());
-            ClassDefinition.addImport(encodedMethod.method.getPrototype().getReturnType().getJavaTypeDescriptor());
+            if (!SignatureFormatter.writeSignature(writer, annotationSet, SignatureFormatter.Origin.Method)) {
+                writer.write(TypeFormatter.getType(encodedMethod.method.getPrototype().getReturnType()));
+            }
             writer.write(' ');
             writer.write(encodedMethod.method.getMethodName().getStringValue());
         }
@@ -156,29 +174,28 @@ public class MethodDefinition {
 
     private void writeSignature(IndentingWriter writer) throws IOException {
         writer.write('(');
-        List<TypeIdItem> parameterTypes = encodedMethod.method.getPrototype().getParameterTypes();
+        List<String> parameterTypes = getParameterTypes();
 
-        boolean firstTime = true;
+        boolean first = true;
         int firstParameter = -1;
         if (encodedMethod.codeItem != null) {
             firstParameter = getRegisterCount(encodedMethod) - parameterTypes.size();
         }
         for (int i = 0; i < parameterTypes.size(); i++) {
-            if (!firstTime) {
+            if (!first) {
                 writer.write(", ");
             }
-            firstTime = false;
-            writer.write(parameterTypes.get(i).getShortJavaTypeDescriptor());
-            ClassDefinition.addImport(parameterTypes.get(i).getJavaTypeDescriptor());
+            first = false;
+            writer.write(parameterTypes.get(i));
             writer.write(' ');
             if (firstParameter >= 0) {
                 RegisterFormatter.writeTo(writer, encodedMethod.codeItem, firstParameter + i);
             } else {
-                writer.write('p');
-                writer.write(i + 1);
+                writer.write("p" + (i + 1));
             }
         }
         writer.write(')');
+        setParameterTypes(null);
     }
 
     private static int getRegisterCount(ClassDataItem.EncodedMethod encodedMethod) {

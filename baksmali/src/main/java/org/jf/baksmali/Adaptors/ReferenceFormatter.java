@@ -51,13 +51,10 @@ public class ReferenceFormatter {
 
     public static String getMethodReference(MethodIdItem item, boolean isStaticReference) {
         String methodName = item.getMethodName().getStringValue();
-        String descriptor = item.getContainingClass().getShortJavaTypeDescriptor();
         if (methodName.equals("<init>") || methodName.equals("<clinit>")) {
-            ClassDefinition.addImport(item.getContainingClass().getJavaTypeDescriptor());
-            return descriptor;
+            return TypeFormatter.getType(item.getContainingClass());
         } else if (isStaticReference) {
-            ClassDefinition.addImport(item.getContainingClass().getJavaTypeDescriptor());
-            return descriptor + "." + methodName;
+            return TypeFormatter.getType(item.getContainingClass()) + "." + methodName;
         }
         return methodName;
     }
@@ -71,14 +68,7 @@ public class ReferenceFormatter {
     }
 
     public static String getTypeReference(TypeIdItem item) {
-        ClassDefinition.addImport(item.getJavaTypeDescriptor());
-        return item.getShortJavaTypeDescriptor();
-    }
-
-    public static String getFullTypeReference(TypeIdItem item) {
-        String descriptor = item.getJavaTypeDescriptor();
-        ClassDefinition.addImport(descriptor);
-        return descriptor;
+        return TypeFormatter.getType(item);
     }
 
     public static void writeReference(IndentingWriter writer, Item item) throws IOException {

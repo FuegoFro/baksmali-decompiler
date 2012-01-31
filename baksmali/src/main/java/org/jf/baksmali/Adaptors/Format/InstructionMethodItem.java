@@ -28,10 +28,7 @@
 
 package org.jf.baksmali.Adaptors.Format;
 
-import org.jf.baksmali.Adaptors.ClassDefinition;
-import org.jf.baksmali.Adaptors.MethodItem;
-import org.jf.baksmali.Adaptors.ReferenceFormatter;
-import org.jf.baksmali.Adaptors.RegisterFormatter;
+import org.jf.baksmali.Adaptors.*;
 import org.jf.dexlib.Code.*;
 import org.jf.dexlib.CodeItem;
 import org.jf.dexlib.Item;
@@ -420,7 +417,7 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
 
     private String getCalledMethodContainingClass() {
         MethodIdItem item = (MethodIdItem) ((InstructionWithReference) instruction).getReferencedItem();
-        return item.getContainingClass().getJavaTypeDescriptor();
+        return TypeFormatter.getFullType(item.getContainingClass());
     }
 
     protected String getStaticReference() {

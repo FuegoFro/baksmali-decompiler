@@ -40,13 +40,14 @@ public class AnnotationFormatter {
 
     public static void writeTo(IndentingWriter writer, AnnotationSetItem annotationSet) throws IOException {
         boolean first = true;
-        for (AnnotationItem annotationItem: annotationSet.getAnnotations()) {
+        for (AnnotationItem annotationItem : annotationSet.getAnnotations()) {
             if (!first) {
                 writer.write('\n');
             }
             first = false;
-
-            writeTo(writer, annotationItem);
+            if (!annotationItem.getEncodedAnnotation().annotationType.getTypeDescriptor().equals("Ldalvik/annotation/Signature;")) {
+                writeTo(writer, annotationItem);
+            }
         }
     }
 

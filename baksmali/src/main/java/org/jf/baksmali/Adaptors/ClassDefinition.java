@@ -33,7 +33,7 @@ import org.jf.dexlib.Code.Analysis.ValidationException;
 import org.jf.dexlib.Code.Format.Instruction21c;
 import org.jf.dexlib.Code.Format.Instruction41c;
 import org.jf.dexlib.Code.Instruction;
-import org.jf.dexlib.EncodedValue.EncodedValue;
+import org.jf.dexlib.EncodedValue.*;
 import org.jf.dexlib.Util.AccessFlags;
 import org.jf.dexlib.Util.SparseArray;
 import org.jf.util.IndentingWriter;
@@ -57,6 +57,7 @@ public class ClassDefinition {
     private static HashSet<String> imports = null;
     private boolean isInterface;
     private static String superClass = "";
+    private boolean wroteSignature = false;
 
     public ClassDefinition(ClassDefItem classDefItem) {
         this.classDefItem = classDefItem;
@@ -163,8 +164,10 @@ public class ClassDefinition {
     private void writeUnprocessed(IndentingWriter writer) throws IOException {
         imports = new HashSet<String>();
         writeClass(writer);
-        writeSuper(writer);
-        writeInterfaces(writer);
+        if (!wroteSignature) {
+            writeSuper(writer);
+            writeInterfaces(writer);
+        }
         writer.write(" {");
         writer.indent(4);
         writeAnnotations(writer);
@@ -183,7 +186,7 @@ public class ClassDefinition {
 
     private void writePackage(IndentingWriter writer) throws IOException {
         writer.write("package ");
-        String descriptor = classDefItem.getClassType().getJavaTypeDescriptor();
+        String descriptor = TypeFormatter.getFullType(classDefItem.getClassType());
         int lastPeriod = descriptor.lastIndexOf('.');
         writer.write(descriptor.substring(0, lastPeriod));
         writer.write(";\n\n");
@@ -204,8 +207,18 @@ public class ClassDefinition {
         if (!isInterface) {
             writer.write("class ");
         }
-        String descriptor = classDefItem.getClassType().getShortJavaTypeDescriptor();
+        String descriptor = TypeFormatter.getType(classDefItem.getClassType());
         writer.write(descriptor);
+
+        AnnotationDirectoryItem annotationDirectory = classDefItem.getAnnotations();
+        if (annotationDirectory == null) {
+            return;
+        }
+
+        wroteSignature = SignatureFormatter.writeSignature(
+                writer,
+                annotationDirectory.getClassAnnotations(),
+                SignatureFormatter.Origin.Class);
     }
 
     private void writeAccessFlags(IndentingWriter writer) throws IOException {
@@ -221,11 +234,10 @@ public class ClassDefinition {
     private void writeSuper(IndentingWriter writer) throws IOException {
         TypeIdItem superClass = classDefItem.getSuperclass();
         if (superClass != null) {
-            ClassDefinition.superClass = superClass.getJavaTypeDescriptor();
+            ClassDefinition.superClass = superClass.getTypeDescriptor();
             if (!superClass.getTypeDescriptor().equals("Ljava/lang/Object;")) {
                 writer.write(" extends ");
-                writer.write(superClass.getShortJavaTypeDescriptor());
-                addImport(superClass.getJavaTypeDescriptor());
+                writer.write(TypeFormatter.getType(superClass));
             }
         }
     }
@@ -248,8 +260,7 @@ public class ClassDefinition {
                 writer.write(", ");
             }
             firstTime = false;
-            writer.write(typeIdItem.getShortJavaTypeDescriptor());
-            addImport(typeIdItem.getJavaTypeDescriptor());
+            writer.write(TypeFormatter.getType(typeIdItem));
         }
     }
 
