@@ -74,6 +74,16 @@ public class RegisterFormatter {
         return locals[register];
     }
 
+    public static boolean isLocal(String registerContents) {
+        boolean isLocal = false;
+        for (int i = 0, localsLength = locals.length; i < localsLength; i++) {
+            if (locals[i]) {
+                isLocal = isLocal || RegisterFormatter.registerContents[i].equals(registerContents);
+            }
+        }
+        return isLocal;
+    }
+
     public static void setLocal(int register, boolean isLocal) {
         locals[register] = isLocal;
     }

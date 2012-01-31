@@ -35,12 +35,12 @@ import org.jf.util.IndentingWriter;
 import java.io.IOException;
 
 public class ReferenceFormatter {
-    public static String getReference(Item item, boolean staticMethod) {
+    public static String getReference(Item item, boolean isStatic) {
         switch (item.getItemType()) {
             case TYPE_METHOD_ID_ITEM:
-                return getMethodReference((MethodIdItem) item, staticMethod);
+                return getMethodReference((MethodIdItem) item, isStatic);
             case TYPE_FIELD_ID_ITEM:
-                return getFieldReference((FieldIdItem) item);
+                return getFieldReference((FieldIdItem) item, isStatic);
             case TYPE_STRING_ID_ITEM:
                 return getStringReference((StringIdItem) item);
             case TYPE_TYPE_ID_ITEM:
@@ -59,8 +59,12 @@ public class ReferenceFormatter {
         return methodName;
     }
 
-    public static String getFieldReference(FieldIdItem item) {
-        return item.getFieldName().getStringValue();
+    public static String getFieldReference(FieldIdItem item, boolean isStatic) {
+        String rtn = "";
+        if (isStatic && !ClassDefinition.isCurrentClass(item.getContainingClass().getTypeDescriptor())) {
+            rtn = TypeFormatter.getType(item.getContainingClass()) + ".";
+        }
+        return rtn + item.getFieldName().getStringValue();
     }
 
     public static String getStringReference(StringIdItem item) {
@@ -80,7 +84,7 @@ public class ReferenceFormatter {
     }
 
     public static void writeFieldReference(IndentingWriter writer, FieldIdItem item) throws IOException {
-        writer.write(getFieldReference(item));
+        writer.write(getFieldReference(item, false));
     }
 
     public static void writeStringReference(IndentingWriter writer, StringIdItem item) throws IOException {

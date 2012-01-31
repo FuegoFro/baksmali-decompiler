@@ -56,6 +56,7 @@ public class ClassDefinition {
 
     private static HashSet<String> imports = null;
     private boolean isInterface;
+    private static String className = "";
     private static String superClass = "";
     private boolean wroteSignature = false;
 
@@ -152,8 +153,12 @@ public class ClassDefinition {
         }
     }
 
-    public static boolean isSuper(String classDescription) {
-        return superClass.equals(classDescription);
+    public static boolean isSuper(String dalvikClassDescription) {
+        return superClass.equals(dalvikClassDescription);
+    }
+
+    public static boolean isCurrentClass(String dalvikClassDescription) {
+        return className.equals(dalvikClassDescription);
     }
 
     public void writeTo(IndentingWriter unprocessedWriter, IndentingWriter baseWriter) throws IOException {
@@ -207,6 +212,7 @@ public class ClassDefinition {
         if (!isInterface) {
             writer.write("class ");
         }
+        className = classDefItem.getClassType().getTypeDescriptor();
         String descriptor = TypeFormatter.getType(classDefItem.getClassType());
         writer.write(descriptor);
 

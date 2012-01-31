@@ -82,6 +82,7 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
             }
         } else if (value == 0x0d) { // move-exception
             setFirstRegisterContents(writer, "caught-exception");
+            //Todo: How to handle this properly? Might have to wait for proper try/catch
         } else if (value == 0x0e) { // return-void
             writeOpcode(writer);
         } else if (value >= 0xf && value <= 0x011) { //return value
@@ -200,12 +201,12 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
             writer.write('[');
             writeThirdRegister(writer);
             writer.write(']');
-            writeEquals(writer);
+            writer.write(" = ");
             writeFirstRegister(writer);
         } else if (value >= 0x051 && value <= 0x058) { //iget
             String contents = getReference();
             String secondRegister = getSecondRegisterContents();
-            if (!secondRegister.equals("this")) {
+            if (!secondRegister.equals("this") || RegisterFormatter.isLocal(contents)) {
                 contents = getSecondRegisterContents() + "." + contents;
             }
             setFirstRegisterContents(writer, contents);
@@ -214,18 +215,19 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
                     + (((codeItem.getParent().accessFlags & AccessFlags.STATIC.getValue()) == 0) ? 1 : 0);
             int registerCount = codeItem.getRegisterCount();
             int secondRegister = ((TwoRegisterInstruction) instruction).getRegisterB();
-            if (secondRegister != registerCount - parameterRegisterCount) {
+            String referencedClass = getReference();
+            if (secondRegister != registerCount - parameterRegisterCount || RegisterFormatter.isLocal(referencedClass)) {
                 writeSecondRegister(writer);
                 writer.write('.');
             }
-            writeReference(writer);
-            writeEquals(writer);
+            writer.write(referencedClass);
+            writer.write(" = ");
             writeFirstRegister(writer);
         } else if (value >= 0x060 && value <= 0x066) { //sget
-            setFirstRegisterContents(writer, getReference());
+            setFirstRegisterContents(writer, getStaticReference());
         } else if (value >= 0x067 && value <= 0x06d) { //sput
-            writeReference(writer);
-            writeEquals(writer);
+            writeStaticReference(writer);
+            writer.write(" = ");
             writeFirstRegister(writer);
         } else if (value >= 0x06e && value <= 0x072 && value != 0x06f && value != 0x071) { //invoke non-super non-static
             invoke(writer, false);
@@ -289,10 +291,6 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
     private boolean isConstructor() {
         String methodName = ((MethodIdItem) (((InstructionWithReference) instruction).getReferencedItem())).getMethodName().getStringValue();
         return methodName.equals("<init>");
-    }
-
-    private void writeEquals(IndentingWriter writer) throws IOException {
-        writer.write(" = ");
     }
 
     protected void writeOpcode(IndentingWriter writer) throws IOException {
@@ -372,10 +370,15 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
         ReferenceFormatter.writeReference(writer, item);
     }
 
+    private void writeStaticReference(IndentingWriter writer) throws IOException {
+        Item item = ((InstructionWithReference) instruction).getReferencedItem();
+        writer.write(ReferenceFormatter.getReference(item, true));
+    }
+
     private void setRegisterContents(IndentingWriter writer, int register, String contents) throws IOException {
         if (RegisterFormatter.isLocal(register)) {
             writeRegister(writer, register);
-            writeEquals(writer);
+            writer.write(" = ");
             writer.write(contents);
         } else {
             previousNonPrintingInstruction = RegisterFormatter.getRegisterName(codeItem, register) + " = " + contents;
@@ -417,7 +420,7 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
 
     private String getCalledMethodContainingClass() {
         MethodIdItem item = (MethodIdItem) ((InstructionWithReference) instruction).getReferencedItem();
-        return TypeFormatter.getFullType(item.getContainingClass());
+        return item.getContainingClass().getTypeDescriptor();
     }
 
     protected String getStaticReference() {
