@@ -55,7 +55,7 @@ public class ClassDefinition {
     protected boolean validationErrors;
 
     private static HashSet<String> imports = null;
-    private boolean isInterface;
+    private static boolean isInterface;
     private static String className = "";
     private static String superClass = "";
     private boolean wroteSignature = false;
@@ -159,6 +159,10 @@ public class ClassDefinition {
 
     public static boolean isCurrentClass(String dalvikClassDescription) {
         return className.equals(dalvikClassDescription);
+    }
+
+    public static boolean isInterface() {
+        return isInterface;
     }
 
     public void writeTo(IndentingWriter unprocessedWriter, IndentingWriter baseWriter) throws IOException {

@@ -147,29 +147,36 @@ public class MethodDefinition {
             writer.write(encodedMethod.method.getMethodName().getStringValue());
         }
         writeSignature(writer);
-        writer.write(" {");
 
-        writer.indent(4);
-        if (codeItem != null) {
-            if (annotationSet != null) {
-                AnnotationFormatter.writeTo(writer, annotationSet);
-            }
 
-            writer.write('\n');
+        if (AccessFlags.hasFlag(encodedMethod.accessFlags, AccessFlags.NATIVE) ||
+                ClassDefinition.isInterface()) {
+            writer.write(";\n");
+        } else {
+            writer.write(" {");
 
-            for (MethodItem methodItem : getMethodItems()) {
-                if (methodItem.writeTo(writer)) {
-                    writer.write(";\n");
+            writer.indent(4);
+            if (codeItem != null) {
+                if (annotationSet != null) {
+                    AnnotationFormatter.writeTo(writer, annotationSet);
+                }
+
+                writer.write('\n');
+
+                for (MethodItem methodItem : getMethodItems()) {
+                    if (methodItem.writeTo(writer)) {
+                        writer.write(";\n");
+                    }
+                }
+            } else {
+                writeParameters(writer, codeItem, parameterAnnotations);
+                if (annotationSet != null) {
+                    AnnotationFormatter.writeTo(writer, annotationSet);
                 }
             }
-        } else {
-            writeParameters(writer, codeItem, parameterAnnotations);
-            if (annotationSet != null) {
-                AnnotationFormatter.writeTo(writer, annotationSet);
-            }
+            writer.deindent(4);
+            writer.write("}\n");
         }
-        writer.deindent(4);
-        writer.write("}\n");
     }
 
     private void writeSignature(IndentingWriter writer) throws IOException {
@@ -212,8 +219,9 @@ public class MethodDefinition {
 
     private static void writeAccessFlags(IndentingWriter writer, ClassDataItem.EncodedMethod encodedMethod)
             throws IOException {
+        boolean isInterface = ClassDefinition.isInterface();
         for (AccessFlags accessFlag : AccessFlags.getAccessFlagsForMethod(encodedMethod.accessFlags)) {
-            if (!accessFlag.toString().equals("constructor")) {
+            if (!accessFlag.toString().equals("constructor") && !(isInterface && accessFlag.toString().equals("abstract"))) {
                 writer.write(accessFlag.toString());
                 writer.write(' ');
             }
@@ -252,7 +260,7 @@ public class MethodDefinition {
         int regCount = -1;
         if (encodedMethod.codeItem != null) {
             regCount = getRegisterCount(encodedMethod);
-            if (AccessFlags.hasFlag(encodedMethod.accessFlags, AccessFlags.STATIC)) {
+            if (!AccessFlags.hasFlag(encodedMethod.accessFlags, AccessFlags.STATIC)) {
                 RegisterFormatter.setRegisterContents(regCount - parameterCount - 1, "this");
             }
         }
