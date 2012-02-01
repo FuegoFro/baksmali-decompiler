@@ -212,7 +212,7 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
             setFirstRegisterContents(writer, contents);
         } else if (value >= 0x059 && value <= 0x05f) { //iput
             int parameterRegisterCount = codeItem.getParent().method.getPrototype().getParameterRegisterCount()
-                    + (((codeItem.getParent().accessFlags & AccessFlags.STATIC.getValue()) == 0) ? 1 : 0);
+                    + (!AccessFlags.hasFlag(codeItem.getParent().accessFlags, AccessFlags.STATIC) ? 1 : 0);
             int registerCount = codeItem.getRegisterCount();
             int secondRegister = ((TwoRegisterInstruction) instruction).getRegisterB();
             String referencedClass = getReference();

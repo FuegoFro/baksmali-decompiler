@@ -158,7 +158,7 @@ public class PreInstructionRegisterInfoMethodItem extends MethodItem {
     private void addParamRegs(BitSet registers, int registerCount) {
         ClassDataItem.EncodedMethod encodedMethod = methodAnalyzer.getMethod();
         int parameterRegisterCount = encodedMethod.method.getPrototype().getParameterRegisterCount();
-        if ((encodedMethod.accessFlags & AccessFlags.STATIC.getValue()) == 0) {
+        if (AccessFlags.hasFlag(encodedMethod.accessFlags, AccessFlags.STATIC)) {
             parameterRegisterCount++;
         }
 

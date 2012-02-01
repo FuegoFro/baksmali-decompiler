@@ -174,7 +174,7 @@ public class baksmali {
             String classDescriptor = classDefItem.getClassType().getTypeDescriptor();
 
             //don't print synthetic classes
-            if ((classDefItem.getAccessFlags() & AccessFlags.SYNTHETIC.getValue()) != 0) {
+            if (AccessFlags.hasFlag(classDefItem.getAccessFlags(), AccessFlags.SYNTHETIC)) {
                 continue;
             }
 

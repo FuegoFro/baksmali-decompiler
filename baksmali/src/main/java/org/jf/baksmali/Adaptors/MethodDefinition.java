@@ -125,7 +125,7 @@ public class MethodDefinition {
         final CodeItem codeItem = encodedMethod.codeItem;
 
         //don't print synthetic fields
-        if ((encodedMethod.accessFlags & AccessFlags.SYNTHETIC.getValue()) != 0) {
+        if (AccessFlags.hasFlag(encodedMethod.accessFlags, AccessFlags.SYNTHETIC)) {
             return;
         }
 
@@ -137,7 +137,7 @@ public class MethodDefinition {
         }
 
         writeAccessFlags(writer, encodedMethod);
-        if ((encodedMethod.accessFlags & AccessFlags.CONSTRUCTOR.getValue()) != 0) {
+        if (AccessFlags.hasFlag(encodedMethod.accessFlags, AccessFlags.CONSTRUCTOR)) {
             writer.write(TypeFormatter.getType(encodedMethod.method.getContainingClass()));
         } else {
             if (!SignatureFormatter.writeSignature(writer, annotationSet, SignatureFormatter.Origin.Method)) {
@@ -202,7 +202,7 @@ public class MethodDefinition {
         int totalRegisters = encodedMethod.codeItem.getRegisterCount();
         if (baksmali.useLocalsDirective) {
             int parameterRegisters = encodedMethod.method.getPrototype().getParameterRegisterCount();
-            if ((encodedMethod.accessFlags & AccessFlags.STATIC.getValue()) == 0) {
+            if (!AccessFlags.hasFlag(encodedMethod.accessFlags, AccessFlags.STATIC)) {
                 parameterRegisters++;
             }
             return totalRegisters - parameterRegisters;
@@ -252,7 +252,7 @@ public class MethodDefinition {
         int regCount = -1;
         if (encodedMethod.codeItem != null) {
             regCount = getRegisterCount(encodedMethod);
-            if ((encodedMethod.accessFlags & AccessFlags.STATIC.getValue()) == 0) {
+            if (AccessFlags.hasFlag(encodedMethod.accessFlags, AccessFlags.STATIC)) {
                 RegisterFormatter.setRegisterContents(regCount - parameterCount - 1, "this");
             }
         }

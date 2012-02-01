@@ -44,7 +44,7 @@ public class FieldDefinition {
                                boolean setInStaticConstructor) throws IOException {
 
         //don't print synthetic fields
-        if ((encodedField.accessFlags & AccessFlags.SYNTHETIC.getValue()) != 0) {
+        if (AccessFlags.hasFlag(encodedField.accessFlags, AccessFlags.SYNTHETIC)) {
             return;
         }
 
@@ -52,7 +52,7 @@ public class FieldDefinition {
 
         if (setInStaticConstructor &&
                 encodedField.isStatic() &&
-                (encodedField.accessFlags & AccessFlags.FINAL.getValue()) != 0 &&
+                AccessFlags.hasFlag(encodedField.accessFlags, AccessFlags.FINAL) &&
                 initialValue != null &&
                 (
                         //it's a primitive type, or it's an array/reference type and the initial value isn't null

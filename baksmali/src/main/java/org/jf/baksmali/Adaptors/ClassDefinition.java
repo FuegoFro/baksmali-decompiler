@@ -228,7 +228,7 @@ public class ClassDefinition {
     }
 
     private void writeAccessFlags(IndentingWriter writer) throws IOException {
-        isInterface = (classDefItem.getAccessFlags() & AccessFlags.INTERFACE.getValue()) != 0;
+        isInterface = AccessFlags.hasFlag(classDefItem.getAccessFlags(), AccessFlags.INTERFACE);
         for (AccessFlags accessFlag : AccessFlags.getAccessFlagsForClass(classDefItem.getAccessFlags())) {
             if (!(isInterface && accessFlag.equals(AccessFlags.ABSTRACT))) {
                 writer.write(accessFlag.toString());

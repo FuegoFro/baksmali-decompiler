@@ -91,7 +91,7 @@ public class RegisterFormatter {
     public static String getRegisterName(CodeItem codeItem, int register) {
         if (!baksmali.noParameterRegisters) {
             int parameterRegisterCount = codeItem.getParent().method.getPrototype().getParameterRegisterCount()
-                    + (((codeItem.getParent().accessFlags & AccessFlags.STATIC.getValue()) == 0) ? 1 : 0);
+                    + (!AccessFlags.hasFlag(codeItem.getParent().accessFlags, AccessFlags.STATIC) ? 1 : 0);
             int registerCount = codeItem.getRegisterCount();
             if (register >= registerCount - parameterRegisterCount) {
                 return 'p' + String.valueOf((register - (registerCount - parameterRegisterCount)));

@@ -168,6 +168,10 @@ public enum AccessFlags
         return accessFlagsByName.get(accessFlag);
     }
 
+    public static boolean hasFlag(int accessFlags, AccessFlags flag) {
+        return (accessFlags & flag.getValue()) != 0;
+    }
+
     public int getValue() {
         return value;
     }
