@@ -87,8 +87,16 @@ public class FieldDefinition {
     private static void writeAccessFlags(IndentingWriter writer, ClassDataItem.EncodedField encodedField)
             throws IOException {
         for (AccessFlags accessFlag : AccessFlags.getAccessFlagsForField(encodedField.accessFlags)) {
-            writer.write(accessFlag.toString());
-            writer.write(' ');
+            if (accessFlag.equals(AccessFlags.PUBLIC) ||
+                    accessFlag.equals(AccessFlags.PRIVATE) ||
+                    accessFlag.equals(AccessFlags.PROTECTED) ||
+                    accessFlag.equals(AccessFlags.STATIC) ||
+                    accessFlag.equals(AccessFlags.FINAL) ||
+                    accessFlag.equals(AccessFlags.VOLATILE) ||
+                    accessFlag.equals(AccessFlags.TRANSIENT)) {
+                writer.write(accessFlag.toString());
+                writer.write(' ');
+            }
         }
     }
 }

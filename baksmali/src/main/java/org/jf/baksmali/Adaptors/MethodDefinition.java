@@ -221,7 +221,16 @@ public class MethodDefinition {
             throws IOException {
         boolean isInterface = ClassDefinition.isInterface();
         for (AccessFlags accessFlag : AccessFlags.getAccessFlagsForMethod(encodedMethod.accessFlags)) {
-            if (!accessFlag.toString().equals("constructor") && !(isInterface && accessFlag.toString().equals("abstract"))) {
+            if (accessFlag.equals(AccessFlags.PUBLIC) ||
+                    accessFlag.equals(AccessFlags.PRIVATE) ||
+                    accessFlag.equals(AccessFlags.PROTECTED) ||
+                    accessFlag.equals(AccessFlags.STATIC) ||
+                    accessFlag.equals(AccessFlags.FINAL) ||
+                    accessFlag.equals(AccessFlags.SYNCHRONIZED) ||
+                    accessFlag.equals(AccessFlags.NATIVE) ||
+                    accessFlag.equals(AccessFlags.ABSTRACT) ||
+                    accessFlag.equals(AccessFlags.STRICTFP) ||
+                    (accessFlag.equals(AccessFlags.ABSTRACT) && !isInterface)) {
                 writer.write(accessFlag.toString());
                 writer.write(' ');
             }
