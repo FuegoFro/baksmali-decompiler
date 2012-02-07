@@ -56,7 +56,8 @@ public class ClassDefinition {
 
     private static HashSet<String> imports = null;
     private static boolean isInterface;
-    private static String className = "";
+    private static String dalvikClassName = "";
+    private static String javaClassName = "";
     private static String superClass = "";
     private boolean wroteSignature = false;
 
@@ -148,7 +149,8 @@ public class ClassDefinition {
 
     public static void addImport(String newImport) {
         newImport = newImport.replace("[]", "");
-        if (newImport.indexOf('.') >= 0 && !newImport.startsWith("dalvik")) {
+        if (newImport.indexOf('.') >= 0 &&
+                !(newImport.startsWith("dalvik") || newImport.startsWith(javaClassName))) {
             imports.add(newImport);
         }
     }
@@ -158,7 +160,7 @@ public class ClassDefinition {
     }
 
     public static boolean isCurrentClass(String dalvikClassDescription) {
-        return className.equals(dalvikClassDescription);
+        return dalvikClassName.equals(dalvikClassDescription);
     }
 
     public static boolean isInterface() {
@@ -216,7 +218,8 @@ public class ClassDefinition {
         if (!isInterface) {
             writer.write("class ");
         }
-        className = classDefItem.getClassType().getTypeDescriptor();
+        dalvikClassName = classDefItem.getClassType().getTypeDescriptor();
+        javaClassName = TypeFormatter.getFullType(classDefItem.getClassType());
         String descriptor = TypeFormatter.getType(classDefItem.getClassType());
         writer.write(descriptor);
 
