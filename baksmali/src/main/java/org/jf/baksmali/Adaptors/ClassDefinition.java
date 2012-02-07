@@ -37,6 +37,7 @@ import org.jf.dexlib.EncodedValue.*;
 import org.jf.dexlib.Util.AccessFlags;
 import org.jf.dexlib.Util.SparseArray;
 import org.jf.util.IndentingWriter;
+import org.jf.util.MemoryWriter;
 
 import java.io.IOException;
 import java.util.HashSet;
@@ -167,12 +168,18 @@ public class ClassDefinition {
         return isInterface;
     }
 
-    public void writeTo(IndentingWriter unprocessedWriter, IndentingWriter baseWriter) throws IOException {
-        writeUnprocessed(unprocessedWriter);
-        writeBase(baseWriter);
+    /* The majority of the file is written to memory first because in order to
+       know and write the imports we have to process the entire file. Thus, the
+       body of the file is only written at the end.
+     */
+    public void writeTo(IndentingWriter writer) throws IOException {
+        MemoryWriter body = new MemoryWriter();
+        writeBody(new IndentingWriter(body));
+        writeBase(writer);
+        writer.write(body.getContents());
     }
 
-    private void writeUnprocessed(IndentingWriter writer) throws IOException {
+    private void writeBody(IndentingWriter writer) throws IOException {
         imports = new HashSet<String>();
         writeClass(writer);
         if (!wroteSignature) {

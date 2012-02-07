@@ -148,10 +148,8 @@ public class baksmali {
             }
         });
 
-        // Unprocessed needs to be post processed for clearer Java-like code. It is concatenated onto the base in post-processing.
-        ClassFileNameHandler unprocessedFileNameHandler = new ClassFileNameHandler(outputDirectoryFile, ".unprocessed");
-        // Base contains the package and imports
-        ClassFileNameHandler baseFileNameHandler = new ClassFileNameHandler(outputDirectoryFile, ".java");
+        // Java output file finder
+        ClassFileNameHandler fileNameHandler = new ClassFileNameHandler(outputDirectoryFile, ".java");
 
         for (ClassDefItem classDefItem : classDefItems) {
             /**
@@ -185,64 +183,43 @@ public class baksmali {
                 continue;
             }
 
-            File unprocessedSmaliFile = unprocessedFileNameHandler.getUniqueFilenameForClass(classDescriptor);
-            File baseSmaliFile = baseFileNameHandler.getUniqueFilenameForClass(classDescriptor);
+            File javaFile = fileNameHandler.getUniqueFilenameForClass(classDescriptor);
 
             //create and initialize the top level string template
             ClassDefinition classDefinition = new ClassDefinition(classDefItem);
 
-            //write the disassembly
-            Writer unprocessedWriter = null;
-            Writer baseWriter = null;
+            //write the decompiled code
+            Writer writer = null;
             try {
-                File smaliParent = unprocessedSmaliFile.getParentFile();
-                if (!smaliParent.exists()) {
-                    if (!smaliParent.mkdirs()) {
-                        System.err.println("Unable to create directory " + smaliParent.toString() + " - skipping class");
+                File javaParent = javaFile.getParentFile();
+                if (!javaParent.exists()) {
+                    if (!javaParent.mkdirs()) {
+                        System.err.println("Unable to create directory " + javaParent.toString() + " - skipping class");
                         continue;
                     }
                 }
 
-                if (!unprocessedSmaliFile.exists()) {
-                    if (!unprocessedSmaliFile.createNewFile()) {
-                        System.err.println("Unable to create file " + unprocessedSmaliFile.toString() + " - skipping class");
+                if (!javaFile.exists()) {
+                    if (!javaFile.createNewFile()) {
+                        System.err.println("Unable to create file " + javaFile.toString() + " - skipping class");
                         continue;
                     }
                 }
 
-                if (!baseSmaliFile.exists()) {
-                    if (!baseSmaliFile.createNewFile()) {
-                        System.err.println("Unable to create file " + baseSmaliFile.toString() + " - skipping class");
-                        continue;
-                    }
-                }
-
-                BufferedWriter unprocessedBufWriter = new BufferedWriter(new OutputStreamWriter(
-                        new FileOutputStream(unprocessedSmaliFile), "UTF8"));
                 BufferedWriter baseBufWriter = new BufferedWriter(new OutputStreamWriter(
-                        new FileOutputStream(baseSmaliFile), "UTF8"));
+                        new FileOutputStream(javaFile), "UTF8"));
+                writer = new IndentingWriter(baseBufWriter);
 
-                unprocessedWriter = new IndentingWriter(unprocessedBufWriter);
-                baseWriter = new IndentingWriter(baseBufWriter);
-
-                classDefinition.writeTo((IndentingWriter) unprocessedWriter, (IndentingWriter) baseWriter);
+                classDefinition.writeTo((IndentingWriter) writer);
             } catch (Exception ex) {
                 System.err.println("\n\nError occured while disassembling class " + classDescriptor.replace('/', '.') + " - skipping class");
                 ex.printStackTrace();
             } finally {
-                if (unprocessedWriter != null) {
+                if (writer != null) {
                     try {
-                        unprocessedWriter.close();
+                        writer.close();
                     } catch (Throwable ex) {
-                        System.err.println("\n\nError occured while closing file " + unprocessedSmaliFile.toString());
-                        ex.printStackTrace();
-                    }
-                }
-                if (baseWriter != null) {
-                    try {
-                        baseWriter.close();
-                    } catch (Throwable ex) {
-                        System.err.println("\n\nError occured while closing file " + baseWriter.toString());
+                        System.err.println("\n\nError occured while closing file " + writer.toString());
                         ex.printStackTrace();
                     }
                 }

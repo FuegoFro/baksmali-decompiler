@@ -34,6 +34,8 @@ import org.jf.dexlib.Util.AccessFlags;
 import org.jf.util.IndentingWriter;
 
 import java.io.IOException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * This class contains the logic used for formatting registers
@@ -41,6 +43,7 @@ import java.io.IOException;
 public class RegisterFormatter {
     private static String[] registerContents;
     private static boolean[] locals;
+    private static final Pattern STRING_BUILDER_PATTERN = Pattern.compile("new StringBuilder\\(\\)\\.append\\((.*)\\)\\.toString\\(\\)");
 
     public static void newRegisterSet(int registers) {
         registerContents = new String[registers];
@@ -54,7 +57,22 @@ public class RegisterFormatter {
 
     public static String getRegisterContents(CodeItem codeItem, int register) {
         if (registerContents != null && registerContents[register] != null) {
-            return registerContents[register];
+            String registerContent = registerContents[register];
+            Matcher stringBuilderMatcher = STRING_BUILDER_PATTERN.matcher(registerContent);
+            if (stringBuilderMatcher.find()) {
+                String[] subStrings = stringBuilderMatcher.group(1).split("\\)\\.append\\(");
+                StringBuilder prettyString = new StringBuilder();
+                boolean first = true;
+                for (String subString : subStrings) {
+                    if (!first) {
+                        prettyString.append(" + ");
+                    }
+                    first = false;
+                    prettyString.append(subString);
+                }
+                return prettyString.toString();
+            }
+            return registerContent;
         } else {
             return getRegisterName(codeItem, register);
         }
