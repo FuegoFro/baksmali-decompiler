@@ -35,6 +35,22 @@ import org.jf.util.IndentingWriter;
 import java.io.IOException;
 
 public class ReferenceFormatter {
+    public static String getReferenceType(Item item) {
+        switch (item.getItemType()) {
+            case TYPE_METHOD_ID_ITEM:
+                return ((MethodIdItem) item).getPrototype().getReturnType().getTypeDescriptor();
+            case TYPE_FIELD_ID_ITEM:
+                return ((FieldIdItem) item).getFieldType().getTypeDescriptor();
+            case TYPE_TYPE_ID_ITEM:
+                return ((TypeIdItem) item).getTypeDescriptor();
+            case TYPE_STRING_ID_ITEM:
+                return "Ljava/lang/String;";
+            default:
+                System.err.println("Got type reference for non-method, non-field, non-type instruction: " + item.getItemType().TypeName);
+                return null;
+        }
+    }
+
     public static String getReference(Item item, boolean isStatic) {
         switch (item.getItemType()) {
             case TYPE_METHOD_ID_ITEM:

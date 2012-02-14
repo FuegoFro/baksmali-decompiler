@@ -39,9 +39,13 @@ import org.jf.util.IndentingWriter;
 import java.io.IOException;
 
 public class InstructionMethodItem<T extends Instruction> extends MethodItem {
+    public static final String NUMBER = "I";
+    public static final String BOOLEAN = "Z";
     protected final CodeItem codeItem;
     protected final T instruction;
+
     private static String previousMethodCall = null;
+    private static String previousMethodCallReturnType = null;
     private static String previousNonPrintingInstruction = null;
 
 
@@ -59,22 +63,25 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
     @Override
     public boolean writeTo(IndentingWriter writer) throws IOException {
         short value = instruction.opcode.value;
-        if (previousMethodCall != null && (value < 0x0a || value > 0x0d)) {
+        if (previousMethodCall != null && !(value >= 0x0a && value <= 0x0d)) {
             writer.write(previousMethodCall);
             writer.write(";\n");
             previousMethodCall = null;
+            previousMethodCallReturnType = null;
         }
-        if (previousNonPrintingInstruction != null && (value < 0x028 || value > 0x02a)) {
+        if (previousNonPrintingInstruction != null && !(value >= 0x028 && value <= 0x02a)) {
             previousNonPrintingInstruction = null;
         }
 
         if (value >= 0x01 && value <= 0x09) { //moves
-            return setFirstRegisterContents(writer, getSecondRegisterContents());
+            return setFirstRegisterContents(writer, getSecondRegisterContents(), RegisterFormatter.getRegisterType(getSecondRegister()));
         } else if (value >= 0x0a && value <= 0x0c) { //move-result
             if (previousMethodCall != null) {
                 String previousMethodCall = InstructionMethodItem.previousMethodCall;
+                String previousMethodCallReturnType = InstructionMethodItem.previousMethodCallReturnType;
                 InstructionMethodItem.previousMethodCall = null;
-                return setFirstRegisterContents(writer, previousMethodCall);
+                InstructionMethodItem.previousMethodCallReturnType = null;
+                return setFirstRegisterContents(writer, previousMethodCall, previousMethodCallReturnType);
             } else {
                 RegisterFormatter.clearRegisterContents(getFirstRegister());
                 writeOpcode(writer);
@@ -83,7 +90,7 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
                 return true;
             }
         } else if (value == 0x0d) { // move-exception
-            return setFirstRegisterContents(writer, "caught-exception");
+            return setFirstRegisterContents(writer, "caught-exception", "Ljava/lang/Exception;");
             //Todo: How to handle this properly? Might have to wait for proper try/catch
         } else if (value == 0x0e) { // return-void
             writeOpcode(writer);
@@ -99,9 +106,14 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
             }
             return true;
         } else if (value >= 0x012 && value <= 0x019) { //const primitive
-            return setFirstRegisterContents(writer, getLiteral());
+            String literal = getLiteral();
+            String type = NUMBER;
+            if (literal.equals("0")) {
+                type = null;
+            }
+            return setFirstRegisterContents(writer, literal, type);
         } else if (value >= 0x01a && value <= 0x01c) { //const string, class
-            return setFirstRegisterContents(writer, getReference());
+            return setFirstRegisterContents(writer, getReference(), getReferenceType());
         } else if (value >= 0x01d && value <= 0x01e) { //monitor
             // Todo: Skipped monitor opcodes
             writer.write("//");
@@ -110,17 +122,17 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
             writeFirstRegister(writer);
             return true;
         } else if (value == 0x01f) { //check-cast
-            return setFirstRegisterContents(writer, "(" + getReference() + ") " + getFirstRegisterContents());
+            return setFirstRegisterContents(writer, "(" + getReference() + ") " + getFirstRegisterContents(), getReferenceType());
         } else if (value == 0x020) { // instanceof
-            return setFirstRegisterContents(writer, getSecondRegisterContents() + " " + getOpcode() + " " + getReference());
+            return setFirstRegisterContents(writer, getSecondRegisterContents() + " " + getOpcode() + " " + getReference(), BOOLEAN);
         } else if (value == 0x021) { //array-length
-            return setFirstRegisterContents(writer, getSecondRegisterContents() + getOpcode());
+            return setFirstRegisterContents(writer, getSecondRegisterContents() + getOpcode(), NUMBER);
         } else if (value == 0x022) { // new instance
             RegisterFormatter.clearRegisterContents(getFirstRegister());
             return false;
         } else if (value == 0x023) { // new-array
             String typeReference = getReference();
-            return setFirstRegisterContents(writer, "new " + typeReference.substring(0, typeReference.length() - 2) + "[" + getSecondRegisterContents() + "]");
+            return setFirstRegisterContents(writer, "new " + typeReference.substring(0, typeReference.length() - 2) + "[" + getSecondRegisterContents() + "]", getReferenceType());
         } else if (value == 0x024) { // filled-new-array
             // Todo: Skipped filled-new-array opcodes
             writeOpcode(writer);
@@ -201,7 +213,8 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
             writeFirstRegister(writer);
             writer.write(' ');
             writeOpcode(writer);
-            writer.write(" 0) {\n");
+            String zeroValue = TypeFormatter.zeroAs(RegisterFormatter.getRegisterType(getFirstRegister()));
+            writer.write(" " + zeroValue + ") {\n");
             writer.indent(4);
             writer.write("//goto ");
             writeTargetLabel(writer);
@@ -210,7 +223,7 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
             writer.write("}\n");
             return false;
         } else if (value >= 0x044 && value <= 0x04a) { //aget
-            return setFirstRegisterContents(writer, getSecondRegisterContents() + "[" + getThirdRegisterContents() + "]");
+            return setFirstRegisterContents(writer, getSecondRegisterContents() + "[" + getThirdRegisterContents() + "]", getArrayType());
         } else if (value >= 0x04b && value <= 0x051) { //aput
             writeSecondRegister(writer);
             writer.write('[');
@@ -225,7 +238,7 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
             if (!secondRegister.equals("this") || RegisterFormatter.isLocal(contents)) {
                 contents = getSecondRegisterContents() + "." + contents;
             }
-            return setFirstRegisterContents(writer, contents);
+            return setFirstRegisterContents(writer, contents, getReferenceType());
         } else if (value >= 0x059 && value <= 0x05f) { //iput
             int parameterRegisterCount = codeItem.getParent().method.getPrototype().getParameterRegisterCount()
                     + (!AccessFlags.hasFlag(codeItem.getParent().accessFlags, AccessFlags.STATIC) ? 1 : 0);
@@ -241,7 +254,7 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
             writeFirstRegister(writer);
             return true;
         } else if (value >= 0x060 && value <= 0x066) { //sget
-            return setFirstRegisterContents(writer, getStaticReference());
+            return setFirstRegisterContents(writer, getStaticReference(), getReferenceType());
         } else if (value >= 0x067 && value <= 0x06d) { //sput
             writeStaticReference(writer);
             writer.write(" = ");
@@ -251,26 +264,30 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
             return invoke(writer, false);
         } else if (value == 0x06f) { //invoke super
             previousMethodCall = "super." + getReference() + getInvocation();
+            previousMethodCallReturnType = getReferenceType();
             return false;
         } else if (value == 0x071) { //invoke static
             previousMethodCall = getStaticReference() + getStaticInvocation();
+            previousMethodCallReturnType = getReferenceType();
             return false;
         } else if (value >= 0x074 && value <= 0x078 && value != 0x075 && value != 0x077) { // invoke-range non-super non-static
             return invoke(writer, true);
         } else if (value == 0x075) { //invoke-range super
             previousMethodCall = "super." + getReference() + getRangeInvocation();
+            previousMethodCallReturnType = getReferenceType();
             return false;
         } else if (value == 0x077) { // invoke-range static
             previousMethodCall = getStaticReference() + getStaticRangeInvocation();
+            previousMethodCallReturnType = getReferenceType();
             return false;
         } else if (value >= 0x07b && value <= 0x08f) { //conversions
-            return setFirstRegisterContents(writer, getOpcode() + getSecondRegisterContents());
+            return setFirstRegisterContents(writer, getOpcode() + getSecondRegisterContents(), NUMBER);
         } else if (value >= 0x090 && value <= 0x0af) { //basic arithmetic
-            return setFirstRegisterContents(writer, getSecondRegisterContents() + " " + getOpcode() + " " + getThirdRegisterContents());
+            return setFirstRegisterContents(writer, getSecondRegisterContents() + " " + getOpcode() + " " + getThirdRegisterContents(), NUMBER);
         } else if (value >= 0x0b0 && value <= 0x0cf) { //arithmetic, store in first
-            return setFirstRegisterContents(writer, getFirstRegisterContents() + " " + getOpcode() + " " + getSecondRegisterContents());
+            return setFirstRegisterContents(writer, getFirstRegisterContents() + " " + getOpcode() + " " + getSecondRegisterContents(), NUMBER);
         } else if (value >= 0x0d0 && value <= 0x0e2) { //literal arithmetic
-            return setFirstRegisterContents(writer, getSecondRegisterContents() + " " + getOpcode() + " " + getLiteral());
+            return setFirstRegisterContents(writer, getSecondRegisterContents() + " " + getOpcode() + " " + getLiteral(), NUMBER);
         } else {
             assert false;
             return false;
@@ -291,6 +308,7 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
             invocation = getInvocation();
         }
 
+        previousMethodCallReturnType = getReferenceType();
         if (isConstructor()) {
             if (ClassDefinition.isSuper(getCalledMethodContainingClass())) {
                 if (!invocation.equals("()")) {
@@ -299,7 +317,8 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
             } else if (instance.equals("this")) {
                 previousMethodCall = "this" + invocation;
             } else {
-                return setRegisterContents(writer, instanceRegister, "new " + getReference() + invocation);
+                previousMethodCallReturnType = null;
+                return setRegisterContents(writer, instanceRegister, "new " + getReference() + invocation, getReferenceType());
             }
         } else {
             previousMethodCall = getReference() + invocation;
@@ -397,7 +416,7 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
         writer.write(ReferenceFormatter.getReference(item, true));
     }
 
-    private boolean setRegisterContents(IndentingWriter writer, int register, String contents) throws IOException {
+    private boolean setRegisterContents(IndentingWriter writer, int register, String contents, String type) throws IOException {
         if (RegisterFormatter.isLocal(register)) {
             writeRegister(writer, register);
             writer.write(" = ");
@@ -405,17 +424,21 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
             return true;
         } else {
             previousNonPrintingInstruction = RegisterFormatter.getRegisterName(codeItem, register) + " = " + contents;
-            RegisterFormatter.setRegisterContents(register, contents);
+            RegisterFormatter.setRegisterContents(register, contents, type);
             return false;
         }
     }
 
-    private boolean setFirstRegisterContents(IndentingWriter writer, String contents) throws IOException {
-        return setRegisterContents(writer, getFirstRegister(), contents);
+    private boolean setFirstRegisterContents(IndentingWriter writer, String contents, String type) throws IOException {
+        return setRegisterContents(writer, getFirstRegister(), contents, type);
     }
 
     private int getFirstRegister() {
         return ((SingleRegisterInstruction) instruction).getRegisterA();
+    }
+    
+    private int getSecondRegister() {
+        return ((TwoRegisterInstruction) instruction).getRegisterB();
     }
 
     private String getFirstRegisterContents() {
@@ -440,6 +463,11 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
 
     private String getReference() {
         return ReferenceFormatter.getReference(((InstructionWithReference) instruction).getReferencedItem(), false);
+    }
+    
+    private String getReferenceType() {
+        Item item = ((InstructionWithReference) instruction).getReferencedItem();
+        return ReferenceFormatter.getReferenceType(item);
     }
 
     private String getCalledMethodContainingClass() {
@@ -574,5 +602,17 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
     private String getRangeInstance() throws IOException {
         RegisterRangeInstruction instruction = (RegisterRangeInstruction) this.instruction;
         return RegisterFormatter.getRegisterContents(codeItem, instruction.getStartRegister());
+    }
+    
+    private String getArrayType() {
+        String arrayType = RegisterFormatter.getRegisterType(getSecondRegister());
+        if (arrayType == null) {
+//            System.err.println("NULL ARRAY");
+            return null;
+        } else if (arrayType.length() < 2 || arrayType.charAt(0) != '[') {
+            System.err.println("Non array type parsed as array: " + arrayType);
+            return null;
+        }
+        return arrayType.substring(1);
     }
 }

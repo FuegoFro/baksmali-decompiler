@@ -27,6 +27,8 @@ public class SignatureFormatter {
                                 writer.write(parseClassSignature(signature));
                                 break;
                             case Method:
+                                //This method actually writes any generics the method defines and the return type.
+                                // It also sets the parameter types of the current method.
                                 writer.write(parseMethodSignature(signature));
                                 break;
                             case Field:

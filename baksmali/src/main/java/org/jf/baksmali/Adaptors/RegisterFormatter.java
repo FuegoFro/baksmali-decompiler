@@ -42,16 +42,19 @@ import java.util.regex.Pattern;
  */
 public class RegisterFormatter {
     private static String[] registerContents;
+    private static String[] registerTypes;
     private static boolean[] locals;
     private static final Pattern STRING_BUILDER_PATTERN = Pattern.compile("new StringBuilder\\(\\)\\.append\\((.*)\\)\\.toString\\(\\)");
 
     public static void newRegisterSet(int registers) {
         registerContents = new String[registers];
+        registerTypes = new String[registers];
         locals = new boolean[registers];
     }
 
     public static void clearRegisters() {
         registerContents = null;
+        registerTypes = null;
         locals = null;
     }
 
@@ -78,8 +81,13 @@ public class RegisterFormatter {
         }
     }
 
-    public static void setRegisterContents(int register, String contents) {
+    public static String getRegisterType(int register) {
+        return registerTypes[register];
+    }
+
+    public static void setRegisterContents(int register, String contents, String dalvikType) {
         registerContents[register] = contents;
+        registerTypes[register] = dalvikType;
     }
 
     public static void clearRegisterContents(int register) {
@@ -96,7 +104,7 @@ public class RegisterFormatter {
         boolean isLocal = false;
         for (int i = 0, localsLength = locals.length; i < localsLength; i++) {
             if (locals[i]) {
-                isLocal = isLocal || RegisterFormatter.registerContents[i].equals(registerContents);
+                isLocal = isLocal || registerContents.equals(RegisterFormatter.registerContents[i]);
             }
         }
         return isLocal;

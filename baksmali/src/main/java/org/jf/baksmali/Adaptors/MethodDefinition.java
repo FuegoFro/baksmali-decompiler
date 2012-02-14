@@ -105,7 +105,16 @@ public class MethodDefinition {
         }
     }
 
-    private List<String> getParameterTypes() {
+    private List<String> getDalvikParameterTypes() {
+        List<TypeIdItem> typeIdItems = encodedMethod.method.getPrototype().getParameterTypes();
+        ArrayList<String> dalvikTypes = new ArrayList<String>(typeIdItems.size());
+        for (TypeIdItem typeIdItem : typeIdItems) {
+            dalvikTypes.add(typeIdItem.getTypeDescriptor());
+        }
+        return dalvikTypes;
+    }
+
+    private List<String> getSignatureParameterTypes() {
         if (parameterTypes == null) {
             List<TypeIdItem> typeIdItems = encodedMethod.method.getPrototype().getParameterTypes();
             parameterTypes = new ArrayList<String>(typeIdItems.size());
@@ -124,14 +133,13 @@ public class MethodDefinition {
                         AnnotationSetRefList parameterAnnotations) throws IOException {
         final CodeItem codeItem = encodedMethod.codeItem;
 
-        //don't print synthetic fields
+        //don't print synthetic methods
         if (AccessFlags.hasFlag(encodedMethod.accessFlags, AccessFlags.SYNTHETIC)) {
             return;
         }
 
         if (codeItem != null) {
             RegisterFormatter.newRegisterSet(getRegisterCount(encodedMethod));
-            writeParameters(writer, codeItem, parameterAnnotations);
         } else {
             RegisterFormatter.clearRegisters();
         }
@@ -146,7 +154,7 @@ public class MethodDefinition {
             writer.write(' ');
             writer.write(encodedMethod.method.getMethodName().getStringValue());
         }
-        writeSignature(writer);
+        writeSignature(writer, codeItem, parameterAnnotations);
 
 
         if (AccessFlags.hasFlag(encodedMethod.accessFlags, AccessFlags.NATIVE) ||
@@ -169,7 +177,6 @@ public class MethodDefinition {
                     }
                 }
             } else {
-                writeParameters(writer, codeItem, parameterAnnotations);
                 if (annotationSet != null) {
                     AnnotationFormatter.writeTo(writer, annotationSet);
                 }
@@ -179,27 +186,50 @@ public class MethodDefinition {
         }
     }
 
-    private void writeSignature(IndentingWriter writer) throws IOException {
+    private void writeSignature(IndentingWriter writer, CodeItem codeItem, AnnotationSetRefList annotationSet) throws IOException {
         writer.write('(');
-        List<String> parameterTypes = getParameterTypes();
+        List<String> signatureParameterTypes = getSignatureParameterTypes();
+        List<String> dalvikParameterTypes = getDalvikParameterTypes();
+        LinkedList<String> parameterNames = getParameterNames(codeItem, annotationSet);
 
-        boolean first = true;
         int firstParameter = -1;
         if (encodedMethod.codeItem != null) {
-            firstParameter = getRegisterCount(encodedMethod) - parameterTypes.size();
+            firstParameter = getRegisterCount(encodedMethod) - signatureParameterTypes.size();
         }
-        for (int i = 0; i < parameterTypes.size(); i++) {
+
+        if (firstParameter >= 0 && "this".equals(parameterNames.peekFirst())) {
+            RegisterFormatter.setRegisterContents(firstParameter - 1, parameterNames.removeFirst(), ClassDefinition.getDalvikClassName());
+        }
+
+        if (parameterNames.size() != signatureParameterTypes.size()) {
+            parameterNames = null;
+        }
+
+        boolean first = true;
+        for (int i = 0; i < signatureParameterTypes.size(); i++) {
             if (!first) {
                 writer.write(", ");
             }
             first = false;
-            writer.write(parameterTypes.get(i));
-            writer.write(' ');
-            if (firstParameter >= 0) {
-                RegisterFormatter.writeTo(writer, encodedMethod.codeItem, firstParameter + i);
-            } else {
-                writer.write("p" + (i + 1));
+
+            String type = signatureParameterTypes.get(i);
+            String name = null;
+            if (parameterNames != null) {
+                name = parameterNames.removeFirst();
             }
+            if (firstParameter >= 0) {
+                // If name is null we want to go ahead and set the contents as null
+                RegisterFormatter.setRegisterContents(firstParameter + i, name, dalvikParameterTypes.get(i));
+                RegisterFormatter.setLocal(firstParameter + i, true); //Todo: should vars with null names be set as local?
+            }
+            if (name == null) {
+                // But we want to print it's 'name'
+                name = "p" + (i + 1);
+            }
+
+            writer.write(type);
+            writer.write(' ');
+            writer.write(name);
         }
         writer.write(')');
         setParameterTypes(null);
@@ -237,77 +267,48 @@ public class MethodDefinition {
         }
     }
 
-    private void writeParameters(IndentingWriter writer, CodeItem codeItem,
-                                 AnnotationSetRefList parameterAnnotations) throws IOException {
+    private LinkedList<String> getParameterNames(CodeItem codeItem, AnnotationSetRefList parameterAnnotations)
+            throws IOException {
+        int parameterCount = 0;
+        StringIdItem[] parameterNames = new StringIdItem[0];
         DebugInfoItem debugInfoItem = null;
+
         if (baksmali.outputDebugInfo && codeItem != null) {
             debugInfoItem = codeItem.getDebugInfo();
         }
-
-        int parameterCount = 0;
-        AnnotationSetItem[] annotations;
-        StringIdItem[] parameterNames = null;
-
-        if (parameterAnnotations != null) {
-            annotations = parameterAnnotations.getAnnotationSets();
-            parameterCount = annotations.length;
-        } else {
-            annotations = new AnnotationSetItem[0];
-        }
-
         if (debugInfoItem != null) {
             parameterNames = debugInfoItem.getParameterNames();
-        }
-        if (parameterNames == null) {
-            parameterNames = new StringIdItem[0];
+            if (parameterNames == null) {
+                parameterNames = new StringIdItem[0];
+            }
         }
 
+        if (parameterAnnotations != null) {
+            parameterCount = parameterAnnotations.getAnnotationSets().length;
+        }
         if (parameterCount < parameterNames.length) {
             parameterCount = parameterNames.length;
         }
 
-        int regCount = -1;
-        if (encodedMethod.codeItem != null) {
-            regCount = getRegisterCount(encodedMethod);
-            if (!AccessFlags.hasFlag(encodedMethod.accessFlags, AccessFlags.STATIC)) {
-                RegisterFormatter.setRegisterContents(regCount - parameterCount - 1, "this");
-            }
+        LinkedList<String> rtn = new LinkedList<String>();
+
+        if (!AccessFlags.hasFlag(encodedMethod.accessFlags, AccessFlags.STATIC)) {
+            rtn.add("this");
         }
 
         for (int i = 0; i < parameterCount; i++) {
-            AnnotationSetItem annotationSet = null;
-            if (i < annotations.length) {
-                annotationSet = annotations[i];
-            }
-
             StringIdItem parameterName = null;
             if (i < parameterNames.length) {
                 parameterName = parameterNames[i];
             }
 
-            if (parameterName != null && regCount >= 0) {
-                int register = regCount - parameterCount + i;
-                RegisterFormatter.setRegisterContents(register, parameterName.getStringValue());
-                RegisterFormatter.setLocal(register, true);
-            }
-
-            if (annotationSet != null) {
-                writer.write(".parameter");
-
-                if (parameterName != null) {
-                    writer.write(" \"");
-                    writer.write(parameterName.getStringValue());
-                    writer.write('"');
-                }
-                writer.write('\n');
-
-                writer.indent(4);
-                AnnotationFormatter.writeTo(writer, annotationSet);
-                writer.deindent(4);
-
-                writer.write(".end parameter\n");
+            if (parameterName != null) {
+                rtn.add(parameterName.getStringValue());
+            } else {
+                rtn.add(null);
             }
         }
+        return rtn;
     }
 
     public LabelCache getLabelCache() {

@@ -69,7 +69,7 @@ public abstract class DebugMethodItem extends MethodItem {
             writer.write(signature.getStringValue());
             writer.write('"');
         }
-        RegisterFormatter.setRegisterContents(register, name.getStringValue());
+        RegisterFormatter.setRegisterContents(register, name.getStringValue(), type.getTypeDescriptor());
         RegisterFormatter.setLocal(register, true);
     }
 }
