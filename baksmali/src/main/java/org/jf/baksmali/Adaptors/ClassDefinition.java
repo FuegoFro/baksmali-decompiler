@@ -172,6 +172,10 @@ public class ClassDefinition {
         return dalvikClassName;
     }
 
+    public static String getName() {
+        return javaClassName;
+    }
+
     /* The majority of the file is written to memory first because in order to
        know and write the imports we have to process the entire file. Thus, the
        body of the file is only written at the end.

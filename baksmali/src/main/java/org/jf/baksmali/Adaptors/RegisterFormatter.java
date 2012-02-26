@@ -59,6 +59,10 @@ public class RegisterFormatter {
     }
 
     public static String getRegisterContents(CodeItem codeItem, int register) {
+        return getRegisterContents(codeItem, register, "I");
+    }
+
+    public static String getRegisterContents(CodeItem codeItem, int register, String suggestedDalvikType) {
         if (registerContents != null && registerContents[register] != null) {
             String registerContent = registerContents[register];
             Matcher stringBuilderMatcher = STRING_BUILDER_PATTERN.matcher(registerContent);
@@ -74,6 +78,11 @@ public class RegisterFormatter {
                     prettyString.append(subString);
                 }
                 return prettyString.toString();
+            }
+            if (registerContent.equals("0")) {
+                return TypeFormatter.zeroAs(suggestedDalvikType);
+            } else if (registerContent.equals("1")) {
+                return TypeFormatter.oneAs(suggestedDalvikType);
             }
             return registerContent;
         } else {

@@ -54,6 +54,8 @@ public class MethodDefinition {
     private MethodAnalyzer methodAnalyzer;
 
     private static List<String> parameterTypes = null;
+    private static String name = null;
+    private static TypeIdItem returnType = null;
 
     private final LabelCache labelCache = new LabelCache();
 
@@ -129,9 +131,20 @@ public class MethodDefinition {
         MethodDefinition.parameterTypes = parameterTypes;
     }
 
+    public static String getName() {
+        return name;
+    }
+
+    public static String getDalvikReturnType() {
+        return returnType.getTypeDescriptor();
+    }
+
     public void writeTo(IndentingWriter writer, AnnotationSetItem annotationSet,
                         AnnotationSetRefList parameterAnnotations) throws IOException {
         final CodeItem codeItem = encodedMethod.codeItem;
+
+        name = encodedMethod.method.getMethodName().getStringValue();
+        returnType = encodedMethod.method.getPrototype().getReturnType();
 
         //don't print synthetic methods
         if (AccessFlags.hasFlag(encodedMethod.accessFlags, AccessFlags.SYNTHETIC)) {
@@ -149,7 +162,7 @@ public class MethodDefinition {
             writer.write(TypeFormatter.getType(encodedMethod.method.getContainingClass()));
         } else {
             if (!SignatureFormatter.writeSignature(writer, annotationSet, SignatureFormatter.Origin.Method)) {
-                writer.write(TypeFormatter.getType(encodedMethod.method.getPrototype().getReturnType()));
+                writer.write(TypeFormatter.getType(returnType));
             }
             writer.write(' ');
             writer.write(encodedMethod.method.getMethodName().getStringValue());

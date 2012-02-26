@@ -41,6 +41,7 @@ import java.io.IOException;
 public class InstructionMethodItem<T extends Instruction> extends MethodItem {
     public static final String NUMBER = "I";
     public static final String BOOLEAN = "Z";
+    public static final String OBJECT = "L;";
     protected final CodeItem codeItem;
     protected final T instruction;
 
@@ -98,7 +99,7 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
         } else if (value >= 0xf && value <= 0x011) { //return value
             writeOpcode(writer);
             writer.write(' ');
-            writeFirstRegister(writer);
+            writeFirstRegister(writer, MethodDefinition.getDalvikReturnType());
             int register = getFirstRegister();
             if (!RegisterFormatter.isLocal(register)) {
                 writer.write("; //return ");
@@ -160,7 +161,7 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
         } else if (value == 0x027) { // throw
             writeOpcode(writer);
             writer.write(' ');
-            writeFirstRegister(writer);
+            writeFirstRegister(writer, OBJECT);
             return true;
         } else if (value >= 0x028 && value <= 0x02a) { //goto
             if (previousNonPrintingInstruction != null) {
@@ -230,7 +231,7 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
             writeThirdRegister(writer);
             writer.write(']');
             writer.write(" = ");
-            writeFirstRegister(writer);
+            writeFirstRegister(writer, getArrayType());
             return true;
         } else if (value >= 0x051 && value <= 0x058) { //iget
             String contents = getReference();
@@ -251,14 +252,14 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
             }
             writer.write(referencedClass);
             writer.write(" = ");
-            writeFirstRegister(writer);
+            writeFirstRegister(writer, getReferenceType());
             return true;
         } else if (value >= 0x060 && value <= 0x066) { //sget
             return setFirstRegisterContents(writer, getStaticReference(), getReferenceType());
         } else if (value >= 0x067 && value <= 0x06d) { //sput
             writeStaticReference(writer);
             writer.write(" = ");
-            writeFirstRegister(writer);
+            writeFirstRegister(writer, getReferenceType());
             return true;
         } else if (value >= 0x06e && value <= 0x072 && value != 0x06f && value != 0x071) { //invoke non-super non-static
             return invoke(writer, false);
@@ -350,6 +351,10 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
 
     protected void writeFirstRegister(IndentingWriter writer) throws IOException {
         writeRegister(writer, ((SingleRegisterInstruction) instruction).getRegisterA());
+    }
+
+    protected void writeFirstRegister(IndentingWriter writer, String dalvikType) throws IOException {
+        writer.write(RegisterFormatter.getRegisterContents(codeItem, ((SingleRegisterInstruction) instruction).getRegisterA(), dalvikType));
     }
 
     protected void writeSecondRegister(IndentingWriter writer) throws IOException {
@@ -607,10 +612,10 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
     private String getArrayType() {
         String arrayType = RegisterFormatter.getRegisterType(getSecondRegister());
         if (arrayType == null) {
-//            System.err.println("NULL ARRAY");
+            System.err.println("NULL ARRAY. In method " + MethodDefinition.getName() + " in class " + ClassDefinition.getName());
             return null;
         } else if (arrayType.length() < 2 || arrayType.charAt(0) != '[') {
-            System.err.println("Non array type parsed as array: " + arrayType);
+            System.err.println("Non array type parsed as array: " + arrayType + " In method " + MethodDefinition.getName() + " in class " + ClassDefinition.getName());
             return null;
         }
         return arrayType.substring(1);

@@ -93,4 +93,12 @@ public class TypeFormatter {
                 return "0";
         }
     }
+
+    public static String oneAs(String type) {
+        if (type != null && type.charAt(0) == 'Z') {
+            return "true";
+        } else {
+            return "1";
+        }
+    }
 }
