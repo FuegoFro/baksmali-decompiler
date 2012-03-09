@@ -114,7 +114,7 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
             }
             return setFirstRegisterContents(writer, literal, type);
         } else if (value >= 0x01a && value <= 0x01c) { //const string, class
-            return setFirstRegisterContents(writer, getReference(), getReferenceType());
+            return setFirstRegisterContents(writer, getReference(false), getReferenceType());
         } else if (value >= 0x01d && value <= 0x01e) { //monitor
             // Todo: Skipped monitor opcodes
             writer.write("//");
@@ -123,32 +123,32 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
             writeFirstRegister(writer);
             return true;
         } else if (value == 0x01f) { //check-cast
-            return setFirstRegisterContents(writer, "(" + getReference() + ") " + getFirstRegisterContents(), getReferenceType());
+            return setFirstRegisterContents(writer, "(" + getReference(false) + ") " + getFirstRegisterContents(), getReferenceType());
         } else if (value == 0x020) { // instanceof
-            return setFirstRegisterContents(writer, getSecondRegisterContents() + " " + getOpcode() + " " + getReference(), BOOLEAN);
+            return setFirstRegisterContents(writer, getSecondRegisterContents() + " " + getOpcode() + " " + getReference(false), BOOLEAN);
         } else if (value == 0x021) { //array-length
             return setFirstRegisterContents(writer, getSecondRegisterContents() + getOpcode(), NUMBER);
         } else if (value == 0x022) { // new instance
             RegisterFormatter.clearRegisterContents(getFirstRegister());
             return false;
         } else if (value == 0x023) { // new-array
-            String typeReference = getReference();
+            String typeReference = getReference(false);
             return setFirstRegisterContents(writer, "new " + typeReference.substring(0, typeReference.length() - 2) + "[" + getSecondRegisterContents() + "]", getReferenceType());
         } else if (value == 0x024) { // filled-new-array
             // Todo: Skipped filled-new-array opcodes
             writeOpcode(writer);
             writer.write(' ');
-            writeInvokeRegisters(writer);
+            writer.write(getInvocation(false));
             writer.write(", ");
-            writeReference(writer);
+            writeReference(writer, false);
             return true;
         } else if (value == 0x025) { // filled-new-array-range
             // Todo: Skipped filled-new-array-range opcodes
             writeOpcode(writer);
             writer.write(' ');
-            writeInvokeRangeRegisters(writer);
+            writer.write(getRangeInvocation(false));
             writer.write(", ");
-            writeReference(writer);
+            writeReference(writer, false);
             return true;
         } else if (value == 0x026) { // fill-array-data
             // Todo: Skipped fill array data opcodes
@@ -234,7 +234,7 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
             writeFirstRegister(writer, getArrayType());
             return true;
         } else if (value >= 0x051 && value <= 0x058) { //iget
-            String contents = getReference();
+            String contents = getReference(false);
             String secondRegister = getSecondRegisterContents();
             if (!secondRegister.equals("this") || RegisterFormatter.isLocal(contents)) {
                 contents = getSecondRegisterContents() + "." + contents;
@@ -245,7 +245,7 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
                     + (!AccessFlags.hasFlag(codeItem.getParent().accessFlags, AccessFlags.STATIC) ? 1 : 0);
             int registerCount = codeItem.getRegisterCount();
             int secondRegister = ((TwoRegisterInstruction) instruction).getRegisterB();
-            String referencedClass = getReference();
+            String referencedClass = getReference(false);
             if (secondRegister != registerCount - parameterRegisterCount || RegisterFormatter.isLocal(referencedClass)) {
                 writeSecondRegister(writer);
                 writer.write('.');
@@ -255,30 +255,30 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
             writeFirstRegister(writer, getReferenceType());
             return true;
         } else if (value >= 0x060 && value <= 0x066) { //sget
-            return setFirstRegisterContents(writer, getStaticReference(), getReferenceType());
+            return setFirstRegisterContents(writer, getReference(true), getReferenceType());
         } else if (value >= 0x067 && value <= 0x06d) { //sput
-            writeStaticReference(writer);
+            writeReference(writer, true);
             writer.write(" = ");
             writeFirstRegister(writer, getReferenceType());
             return true;
         } else if (value >= 0x06e && value <= 0x072 && value != 0x06f && value != 0x071) { //invoke non-super non-static
             return invoke(writer, false);
         } else if (value == 0x06f) { //invoke super
-            previousMethodCall = "super." + getReference() + getInvocation();
+            previousMethodCall = "super." + getReference(false) + getInvocation(false);
             previousMethodCallReturnType = getReferenceType();
             return false;
         } else if (value == 0x071) { //invoke static
-            previousMethodCall = getStaticReference() + getStaticInvocation();
+            previousMethodCall = getReference(true) + getInvocation(true);
             previousMethodCallReturnType = getReferenceType();
             return false;
         } else if (value >= 0x074 && value <= 0x078 && value != 0x075 && value != 0x077) { // invoke-range non-super non-static
             return invoke(writer, true);
         } else if (value == 0x075) { //invoke-range super
-            previousMethodCall = "super." + getReference() + getRangeInvocation();
+            previousMethodCall = "super." + getReference(false) + getRangeInvocation(false);
             previousMethodCallReturnType = getReferenceType();
             return false;
         } else if (value == 0x077) { // invoke-range static
-            previousMethodCall = getStaticReference() + getStaticRangeInvocation();
+            previousMethodCall = getReference(true) + getRangeInvocation(true);
             previousMethodCallReturnType = getReferenceType();
             return false;
         } else if (value >= 0x07b && value <= 0x08f) { //conversions
@@ -302,11 +302,11 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
         if (isRange) {
             instance = getRangeInstance();
             instanceRegister = getRangeInstanceRegister();
-            invocation = getRangeInvocation();
+            invocation = getRangeInvocation(false);
         } else {
             instance = getInstance();
             instanceRegister = getInstanceRegister();
-            invocation = getInvocation();
+            invocation = getInvocation(false);
         }
 
         previousMethodCallReturnType = getReferenceType();
@@ -319,10 +319,10 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
                 previousMethodCall = "this" + invocation;
             } else {
                 previousMethodCallReturnType = null;
-                return setRegisterContents(writer, instanceRegister, "new " + getReference() + invocation, getReferenceType());
+                return setRegisterContents(writer, instanceRegister, "new " + getReference(false) + invocation, getReferenceType());
             }
         } else {
-            previousMethodCall = getReference() + invocation;
+            previousMethodCall = getReference(false) + invocation;
             if (!instance.equals("this")) {
                 previousMethodCall = instance + "." + previousMethodCall;
             }
@@ -350,7 +350,7 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
     }
 
     protected void writeFirstRegister(IndentingWriter writer) throws IOException {
-        writeRegister(writer, ((SingleRegisterInstruction) instruction).getRegisterA());
+        writer.write(getFirstRegisterContents());
     }
 
     protected void writeFirstRegister(IndentingWriter writer, String dalvikType) throws IOException {
@@ -358,67 +358,15 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
     }
 
     protected void writeSecondRegister(IndentingWriter writer) throws IOException {
-        writeRegister(writer, ((TwoRegisterInstruction) instruction).getRegisterB());
+        writer.write(getSecondRegisterContents());
     }
 
     protected void writeThirdRegister(IndentingWriter writer) throws IOException {
-        writeRegister(writer, ((ThreeRegisterInstruction) instruction).getRegisterC());
+        writer.write(getThirdRegisterContents());
     }
 
-    protected void writeInvokeRegisters(IndentingWriter writer) throws IOException {
-        FiveRegisterInstruction instruction = (FiveRegisterInstruction) this.instruction;
-        final int regCount = instruction.getRegCount();
-
-        writer.write('(');
-        switch (regCount) {
-            case 2:
-                writeRegister(writer, instruction.getRegisterE());
-                break;
-            case 3:
-                writeRegister(writer, instruction.getRegisterE());
-                writer.write(", ");
-                writeRegister(writer, instruction.getRegisterF());
-                break;
-            case 4:
-                writeRegister(writer, instruction.getRegisterE());
-                writer.write(", ");
-                writeRegister(writer, instruction.getRegisterF());
-                writer.write(", ");
-                writeRegister(writer, instruction.getRegisterG());
-                break;
-            case 5:
-                writeRegister(writer, instruction.getRegisterE());
-                writer.write(", ");
-                writeRegister(writer, instruction.getRegisterF());
-                writer.write(", ");
-                writeRegister(writer, instruction.getRegisterG());
-                writer.write(", ");
-                writeRegister(writer, instruction.getRegisterA());
-                break;
-        }
-        writer.write(')');
-    }
-
-    protected void writeInvokeRangeRegisters(IndentingWriter writer) throws IOException {
-        RegisterRangeInstruction instruction = (RegisterRangeInstruction) this.instruction;
-
-        int regCount = instruction.getRegCount();
-        if (regCount == 0) {
-            writer.write("()");
-        } else {
-            int startRegister = instruction.getStartRegister();
-            RegisterFormatter.writeRegisterRange(writer, codeItem, startRegister + 1, startRegister + regCount - 1);
-        }
-    }
-
-    protected void writeReference(IndentingWriter writer) throws IOException {
-        Item item = ((InstructionWithReference) instruction).getReferencedItem();
-        ReferenceFormatter.writeReference(writer, item);
-    }
-
-    private void writeStaticReference(IndentingWriter writer) throws IOException {
-        Item item = ((InstructionWithReference) instruction).getReferencedItem();
-        writer.write(ReferenceFormatter.getReference(item, true));
+    protected void writeReference(IndentingWriter writer, boolean isStatic) throws IOException {
+        writer.write(getReference(isStatic));
     }
 
     private boolean setRegisterContents(IndentingWriter writer, int register, String contents, String type) throws IOException {
@@ -441,7 +389,7 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
     private int getFirstRegister() {
         return ((SingleRegisterInstruction) instruction).getRegisterA();
     }
-    
+
     private int getSecondRegister() {
         return ((TwoRegisterInstruction) instruction).getRegisterB();
     }
@@ -466,10 +414,10 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
         return instruction.opcode.name;
     }
 
-    private String getReference() {
-        return ReferenceFormatter.getReference(((InstructionWithReference) instruction).getReferencedItem(), false);
+    private String getReference(boolean isStatic) {
+        return ReferenceFormatter.getReference(((InstructionWithReference) instruction).getReferencedItem(), isStatic);
     }
-    
+
     private String getReferenceType() {
         Item item = ((InstructionWithReference) instruction).getReferencedItem();
         return ReferenceFormatter.getReferenceType(item);
@@ -480,118 +428,35 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
         return item.getContainingClass().getTypeDescriptor();
     }
 
-    protected String getStaticReference() {
-        return ReferenceFormatter.getReference(((InstructionWithReference) instruction).getReferencedItem(), true);
-    }
-
-    protected String getInvocation() throws IOException {
+    protected String getInvocation(boolean isStatic) throws IOException {
         FiveRegisterInstruction instruction = (FiveRegisterInstruction) this.instruction;
         final int regCount = instruction.getRegCount();
 
-        String invocation = "(";
-        switch (regCount) {
-            case 2:
-                invocation += RegisterFormatter.getRegisterContents(codeItem, (int) instruction.getRegisterE());
-                break;
-            case 3:
-                invocation += RegisterFormatter.getRegisterContents(codeItem, (int) instruction.getRegisterE());
-                invocation += ", ";
-                invocation += RegisterFormatter.getRegisterContents(codeItem, (int) instruction.getRegisterF());
-                break;
-            case 4:
-                invocation += RegisterFormatter.getRegisterContents(codeItem, (int) instruction.getRegisterE());
-                invocation += ", ";
-                invocation += RegisterFormatter.getRegisterContents(codeItem, (int) instruction.getRegisterF());
-                invocation += ", ";
-                invocation += RegisterFormatter.getRegisterContents(codeItem, (int) instruction.getRegisterG());
-                break;
-            case 5:
-                invocation += RegisterFormatter.getRegisterContents(codeItem, (int) instruction.getRegisterE());
-                invocation += ", ";
-                invocation += RegisterFormatter.getRegisterContents(codeItem, (int) instruction.getRegisterF());
-                invocation += ", ";
-                invocation += RegisterFormatter.getRegisterContents(codeItem, (int) instruction.getRegisterG());
-                invocation += ", ";
-                invocation += RegisterFormatter.getRegisterContents(codeItem, (int) instruction.getRegisterA());
-                break;
+        StringBuilder invocation = new StringBuilder("(");
+        boolean first = true;
+        for (int i = isStatic ? 0 : 1; i < regCount; i++) {
+            if (!first) {
+                invocation.append(", ");
+            }
+            first = false;
+            invocation.append(getRegisterFromInstruction(instruction, i));
         }
-        invocation += ")";
-        return invocation;
+        invocation.append(")");
+
+        return invocation.toString();
     }
 
-    protected String getStaticInvocation() throws IOException {
-        FiveRegisterInstruction instruction = (FiveRegisterInstruction) this.instruction;
-        final int regCount = instruction.getRegCount();
-
-        String invocation = "(";
-        switch (regCount) {
-            case 1:
-                invocation += RegisterFormatter.getRegisterContents(codeItem, (int) instruction.getRegisterD());
-                break;
-            case 2:
-                invocation += RegisterFormatter.getRegisterContents(codeItem, (int) instruction.getRegisterD());
-                invocation += ", ";
-                invocation += RegisterFormatter.getRegisterContents(codeItem, (int) instruction.getRegisterE());
-                break;
-            case 3:
-                invocation += RegisterFormatter.getRegisterContents(codeItem, (int) instruction.getRegisterD());
-                invocation += ", ";
-                invocation += RegisterFormatter.getRegisterContents(codeItem, (int) instruction.getRegisterE());
-                invocation += ", ";
-                invocation += RegisterFormatter.getRegisterContents(codeItem, (int) instruction.getRegisterF());
-                break;
-            case 4:
-                invocation += RegisterFormatter.getRegisterContents(codeItem, (int) instruction.getRegisterD());
-                invocation += ", ";
-                invocation += RegisterFormatter.getRegisterContents(codeItem, (int) instruction.getRegisterE());
-                invocation += ", ";
-                invocation += RegisterFormatter.getRegisterContents(codeItem, (int) instruction.getRegisterF());
-                invocation += ", ";
-                invocation += RegisterFormatter.getRegisterContents(codeItem, (int) instruction.getRegisterG());
-                break;
-            case 5:
-                invocation += RegisterFormatter.getRegisterContents(codeItem, (int) instruction.getRegisterD());
-                invocation += ", ";
-                invocation += RegisterFormatter.getRegisterContents(codeItem, (int) instruction.getRegisterE());
-                invocation += ", ";
-                invocation += RegisterFormatter.getRegisterContents(codeItem, (int) instruction.getRegisterF());
-                invocation += ", ";
-                invocation += RegisterFormatter.getRegisterContents(codeItem, (int) instruction.getRegisterG());
-                invocation += ", ";
-                invocation += RegisterFormatter.getRegisterContents(codeItem, (int) instruction.getRegisterA());
-                break;
-        }
-        invocation += ")";
-        return invocation;
-    }
-
-    protected String getRangeInvocation() throws IOException {
+    protected String getRangeInvocation(boolean isStatic) throws IOException {
         RegisterRangeInstruction instruction = (RegisterRangeInstruction) this.instruction;
+        int staticOffset = isStatic ? 0 : 1;
 
         int regCount = instruction.getRegCount();
         if (regCount == 0) {
             return "()";
         } else {
             int startRegister = instruction.getStartRegister();
-            return RegisterFormatter.getRegisterRange(codeItem, startRegister + 1, startRegister + regCount - 1);
+            return RegisterFormatter.getRegisterRange(codeItem, startRegister + staticOffset, startRegister + regCount - 1);
         }
-    }
-
-    protected String getStaticRangeInvocation() throws IOException {
-        RegisterRangeInstruction instruction = (RegisterRangeInstruction) this.instruction;
-
-        int regCount = instruction.getRegCount();
-        if (regCount == 0) {
-            return "()";
-        } else {
-            int startRegister = instruction.getStartRegister();
-            return RegisterFormatter.getRegisterRange(codeItem, startRegister, startRegister + regCount - 1);
-        }
-    }
-
-    private int getInstanceRegister() throws IOException {
-        FiveRegisterInstruction instruction = (FiveRegisterInstruction) this.instruction;
-        return instruction.getRegisterD();
     }
 
     private String getInstance() throws IOException {
@@ -599,16 +464,21 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
         return RegisterFormatter.getRegisterContents(codeItem, instruction.getRegisterD());
     }
 
+    private String getRangeInstance() throws IOException {
+        RegisterRangeInstruction instruction = (RegisterRangeInstruction) this.instruction;
+        return RegisterFormatter.getRegisterContents(codeItem, instruction.getStartRegister());
+    }
+
+    private int getInstanceRegister() throws IOException {
+        FiveRegisterInstruction instruction = (FiveRegisterInstruction) this.instruction;
+        return instruction.getRegisterD();
+    }
+
     private int getRangeInstanceRegister() throws IOException {
         RegisterRangeInstruction instruction = (RegisterRangeInstruction) this.instruction;
         return instruction.getStartRegister();
     }
 
-    private String getRangeInstance() throws IOException {
-        RegisterRangeInstruction instruction = (RegisterRangeInstruction) this.instruction;
-        return RegisterFormatter.getRegisterContents(codeItem, instruction.getStartRegister());
-    }
-    
     private String getArrayType() {
         String arrayType = RegisterFormatter.getRegisterType(getSecondRegister());
         if (arrayType == null) {
@@ -619,5 +489,30 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
             return null;
         }
         return arrayType.substring(1);
+    }
+
+    private String getRegisterFromInstruction(FiveRegisterInstruction instruction, int register) {
+        int registerNumber;
+        switch (register) {
+            case 0:
+                registerNumber = instruction.getRegisterD();
+                break;
+            case 1:
+                registerNumber = instruction.getRegisterE();
+                break;
+            case 2:
+                registerNumber = instruction.getRegisterF();
+                break;
+            case 3:
+                registerNumber = instruction.getRegisterG();
+                break;
+            case 4:
+                registerNumber = instruction.getRegisterA();
+                break;
+            default:
+                System.err.println("Register number must be a value between 0 and 4");
+                return "";
+        }
+        return RegisterFormatter.getRegisterContents(codeItem, registerNumber);
     }
 }

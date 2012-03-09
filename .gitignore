@@ -6,3 +6,4 @@
 /smali-integration-tests/target
 *.iml
 .idea/
+*~
