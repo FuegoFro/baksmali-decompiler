@@ -29,6 +29,11 @@ public class Signature {
         next = findNext();
     }
 
+    public Signature(String signature) {
+        this.signature = signature;
+        next = findNext();
+    }
+
     public Token getNext() {
         Token rtn = next;
         next = findNext();

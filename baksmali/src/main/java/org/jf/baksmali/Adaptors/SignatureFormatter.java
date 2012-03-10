@@ -96,7 +96,7 @@ public class SignatureFormatter {
         return parseType(new Signature(signatureValues));
     }
 
-    private static String parseType(Signature signature) {
+    static String parseType(Signature signature) {
         Signature.Token token = signature.getNext();
         if (!token.type.equals(Signature.TokenType.Type)) {
             throw new IllegalStateException("Improper token being parsed as type!");

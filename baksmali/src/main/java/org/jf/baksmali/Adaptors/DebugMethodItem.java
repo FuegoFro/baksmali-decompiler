@@ -50,25 +50,16 @@ public abstract class DebugMethodItem extends MethodItem {
     protected static void writeStartLocal(IndentingWriter writer, CodeItem codeItem, int register,
                                           StringIdItem name, TypeIdItem type, StringIdItem signature)
             throws IOException {
-        boolean wroteSignature = false;
-        if (signature != null && signature.getStringValue().charAt(0) == 'L' && signature.getStringValue().contains("<")) {
-            String signatureValue = signature.getStringValue();
-            signatureValue = signatureValue.substring(1, signatureValue.length() - 1)
-                    .replace('/', '.').replace("<L", "<").replace(";>", ">");
-            writer.write(signatureValue);
-            wroteSignature = true;
+        if (signature != null) {
+            writer.write(SignatureFormatter.parseType(new Signature(signature.getStringValue())));
         } else {
             writer.write(TypeFormatter.getType(type));
         }
         writer.write(' ');
         writer.write(name.getStringValue());
         writer.write(" = ");
-        RegisterFormatter.writeTo(writer, codeItem, register);
-        if (signature != null && !wroteSignature) {
-            writer.write(",\"");
-            writer.write(signature.getStringValue());
-            writer.write('"');
-        }
+        writer.write(RegisterFormatter.getRegisterContents(codeItem, register, type.getTypeDescriptor()));
+
         RegisterFormatter.setRegisterContents(register, name.getStringValue(), type.getTypeDescriptor());
         RegisterFormatter.setLocal(register, true);
     }
