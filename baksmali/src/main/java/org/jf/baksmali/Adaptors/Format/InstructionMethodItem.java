@@ -29,11 +29,8 @@
 package org.jf.baksmali.Adaptors.Format;
 
 import org.jf.baksmali.Adaptors.*;
+import org.jf.dexlib.*;
 import org.jf.dexlib.Code.*;
-import org.jf.dexlib.CodeItem;
-import org.jf.dexlib.Item;
-import org.jf.dexlib.MethodIdItem;
-import org.jf.dexlib.TypeIdItem;
 import org.jf.dexlib.Util.AccessFlags;
 import org.jf.util.IndentingWriter;
 
@@ -268,9 +265,17 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
             writeFirstRegister(writer, getReferenceType());
             return true;
         } else if (value >= 0x060 && value <= 0x066) { //sget
-            return setFirstRegisterContents(writer, getReference(true), getReferenceType());
+            String contents = getReference(true);
+            if (RegisterFormatter.isLocal(contents)) {
+                contents = getFieldClass() + "." + contents;
+            }
+            return setFirstRegisterContents(writer, contents, getReferenceType());
         } else if (value >= 0x067 && value <= 0x06d) { //sput
-            writeReference(writer, true);
+            String fieldName = getReference(true);
+            if (RegisterFormatter.isLocal(fieldName)) {
+                writer.write(getFieldClass() + ".");
+            }
+            writer.write(fieldName);
             writer.write(" = ");
             writeFirstRegister(writer, getReferenceType());
             return true;
@@ -520,5 +525,10 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
             throw new RuntimeException("Method must be called with either a FiveRegisterInstruction or RangeRegisterInstruction");
         }
         return RegisterFormatter.getRegisterContents(codeItem, registerNumber, dalvikType);
+    }
+
+    private String getFieldClass() {
+        FieldIdItem item = (FieldIdItem) ((InstructionWithReference) instruction).getReferencedItem();
+        return TypeFormatter.getType(item.getContainingClass());
     }
 }
