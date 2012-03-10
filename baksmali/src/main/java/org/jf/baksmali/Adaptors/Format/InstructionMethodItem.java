@@ -380,6 +380,13 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
         if (RegisterFormatter.isLocal(register)) {
             writeRegister(writer, register);
             writer.write(" = ");
+
+            String localType = RegisterFormatter.getRegisterType(register);
+            if (contents.equals("0")) {
+                contents = TypeFormatter.zeroAs(localType);
+            } else if (contents.equals("1")) {
+                contents = TypeFormatter.oneAs(localType);
+            }
             writer.write(contents);
             return true;
         } else {
