@@ -9,7 +9,13 @@ public class TypeFormatter {
 
     public static String getType(String unformattedType) {
         String formattedType = parseType(unformattedType);
-        ClassDefinition.addImport(formattedType);
+        String toImport = formattedType;
+        int innerClassBoundry = formattedType.indexOf('$');
+        if (innerClassBoundry > 0) {
+            toImport = formattedType.substring(0, innerClassBoundry);
+        }
+        ClassDefinition.addImport(toImport);
+
         return shortenType(formattedType);
     }
 
@@ -22,7 +28,7 @@ public class TypeFormatter {
         if (lastPeriod >= 0) {
             javaType = javaType.substring(lastPeriod + 1);
         }
-        return javaType;
+        return javaType.replace("$", ".");
     }
 
     private static String parseType(String typeString) {
@@ -31,7 +37,7 @@ public class TypeFormatter {
             if (typeString.charAt(length - 1) == ';') {
                 length--;
             }
-            typeString = typeString.substring(1, length).replace("/", ".").replace("$", ".");
+            typeString = typeString.substring(1, length).replace("/", ".");
         } else if (typeString.charAt(0) == '[') {
             typeString = parseType(typeString.substring(1)) + "[]";
         } else if (typeString.equals("V")) {
