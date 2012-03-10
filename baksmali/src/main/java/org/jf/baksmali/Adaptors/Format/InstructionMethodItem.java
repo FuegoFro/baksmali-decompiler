@@ -33,10 +33,13 @@ import org.jf.dexlib.Code.*;
 import org.jf.dexlib.CodeItem;
 import org.jf.dexlib.Item;
 import org.jf.dexlib.MethodIdItem;
+import org.jf.dexlib.TypeIdItem;
 import org.jf.dexlib.Util.AccessFlags;
 import org.jf.util.IndentingWriter;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 public class InstructionMethodItem<T extends Instruction> extends MethodItem {
     public static final String NUMBER = "I";
@@ -136,17 +139,27 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
             return setFirstRegisterContents(writer, "new " + typeReference.substring(0, typeReference.length() - 2) + "[" + getSecondRegisterContents() + "]", getReferenceType());
         } else if (value == 0x024) { // filled-new-array
             // Todo: Skipped filled-new-array opcodes
+            int regCount = ((InvokeInstruction) instruction).getRegCount();
+            List<TypeIdItem> parameterTypes = new ArrayList<TypeIdItem>(regCount);
+            for (int i = 0; i < regCount; i++) {
+                parameterTypes.add(null);
+            }
             writeOpcode(writer);
             writer.write(' ');
-            writer.write(getInvocation(false));
+            writer.write(getInvocation(parameterTypes, false));
             writer.write(", ");
             writeReference(writer, false);
             return true;
         } else if (value == 0x025) { // filled-new-array-range
             // Todo: Skipped filled-new-array-range opcodes
+            int regCount = ((InvokeInstruction) instruction).getRegCount();
+            List<TypeIdItem> parameterTypes = new ArrayList<TypeIdItem>(regCount);
+            for (int i = 0; i < regCount; i++) {
+                parameterTypes.add(null);
+            }
             writeOpcode(writer);
             writer.write(' ');
-            writer.write(getRangeInvocation(false));
+            writer.write(getInvocation(parameterTypes, false));
             writer.write(", ");
             writeReference(writer, false);
             return true;
@@ -261,26 +274,20 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
             writer.write(" = ");
             writeFirstRegister(writer, getReferenceType());
             return true;
-        } else if (value >= 0x06e && value <= 0x072 && value != 0x06f && value != 0x071) { //invoke non-super non-static
-            return invoke(writer, false);
-        } else if (value == 0x06f) { //invoke super
-            previousMethodCall = "super." + getReference(false) + getInvocation(false);
+        } else if (value == 0x06f || value == 0x071 || value == 0x075 || value == 0x077) { //invoke (range) super and static
+            List<TypeIdItem> parameterTypes = getMethodParameterTypes();
+            boolean isStatic = false;
+            if (value == 0x06f || value == 0x075) { // invoke super
+                previousMethodCall = "super.";
+            } else { // invoke static
+                isStatic = true;
+                previousMethodCall = "";
+            }
+            previousMethodCall += getReference(isStatic) + getInvocation(parameterTypes, isStatic);
             previousMethodCallReturnType = getReferenceType();
             return false;
-        } else if (value == 0x071) { //invoke static
-            previousMethodCall = getReference(true) + getInvocation(true);
-            previousMethodCallReturnType = getReferenceType();
-            return false;
-        } else if (value >= 0x074 && value <= 0x078 && value != 0x075 && value != 0x077) { // invoke-range non-super non-static
-            return invoke(writer, true);
-        } else if (value == 0x075) { //invoke-range super
-            previousMethodCall = "super." + getReference(false) + getRangeInvocation(false);
-            previousMethodCallReturnType = getReferenceType();
-            return false;
-        } else if (value == 0x077) { // invoke-range static
-            previousMethodCall = getReference(true) + getRangeInvocation(true);
-            previousMethodCallReturnType = getReferenceType();
-            return false;
+        } else if ((value >= 0x06e && value <= 0x072) || (value >= 0x074 && value <= 0x078)) { //invoke(range) non-super non-static
+            return invoke(writer);
         } else if (value >= 0x07b && value <= 0x08f) { //conversions
             return setFirstRegisterContents(writer, getOpcode() + getSecondRegisterContents(), NUMBER);
         } else if (value >= 0x090 && value <= 0x0af) { //basic arithmetic
@@ -295,19 +302,14 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
         }
     }
 
-    private boolean invoke(IndentingWriter writer, boolean isRange) throws IOException {
+    private boolean invoke(IndentingWriter writer) throws IOException {
         String instance;
         int instanceRegister;
         String invocation;
-        if (isRange) {
-            instance = getRangeInstance();
-            instanceRegister = getRangeInstanceRegister();
-            invocation = getRangeInvocation(false);
-        } else {
-            instance = getInstance();
-            instanceRegister = getInstanceRegister();
-            invocation = getInvocation(false);
-        }
+        List<TypeIdItem> parameterTypes = getMethodParameterTypes();
+        instanceRegister = getInstanceRegister();
+        instance = RegisterFormatter.getRegisterContents(codeItem, instanceRegister);
+        invocation = getInvocation(parameterTypes, false);
 
         previousMethodCallReturnType = getReferenceType();
         if (isConstructor()) {
@@ -428,91 +430,95 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
         return item.getContainingClass().getTypeDescriptor();
     }
 
-    protected String getInvocation(boolean isStatic) throws IOException {
-        FiveRegisterInstruction instruction = (FiveRegisterInstruction) this.instruction;
+    protected String getInvocation(List<TypeIdItem> parameterTypes, boolean isStatic) {
+        InvokeInstruction instruction = (InvokeInstruction) this.instruction;
         final int regCount = instruction.getRegCount();
+        int parameterSize = parameterTypes.size();
+        int staticOffset = isStatic ? 0 : 1;
 
         StringBuilder invocation = new StringBuilder("(");
         boolean first = true;
-        for (int i = isStatic ? 0 : 1; i < regCount; i++) {
+        for (int i = staticOffset; i < regCount; i++) {
             if (!first) {
                 invocation.append(", ");
             }
             first = false;
-            invocation.append(getRegisterFromInstruction(instruction, i));
+
+            String dalvikType = null;
+            if (i < parameterSize) {
+                TypeIdItem typeIdItem = parameterTypes.get(i - staticOffset);
+                if (typeIdItem != null) {
+                    dalvikType = typeIdItem.toShorty();
+                }
+            }
+            String registerContents = getRegisterFromInstruction(instruction, i, dalvikType);
+            invocation.append(registerContents);
         }
         invocation.append(")");
 
         return invocation.toString();
     }
 
-    protected String getRangeInvocation(boolean isStatic) throws IOException {
-        RegisterRangeInstruction instruction = (RegisterRangeInstruction) this.instruction;
-        int staticOffset = isStatic ? 0 : 1;
-
-        int regCount = instruction.getRegCount();
-        if (regCount == 0) {
-            return "()";
+    private int getInstanceRegister() {
+        if (instruction instanceof FiveRegisterInstruction) {
+            FiveRegisterInstruction fiveReg = (FiveRegisterInstruction) instruction;
+            return fiveReg.getRegisterD();
+        } else if (instruction instanceof RegisterRangeInstruction) {
+            RegisterRangeInstruction rangeReg = (RegisterRangeInstruction) instruction;
+            return rangeReg.getStartRegister();
         } else {
-            int startRegister = instruction.getStartRegister();
-            return RegisterFormatter.getRegisterRange(codeItem, startRegister + staticOffset, startRegister + regCount - 1);
+            throw new RuntimeException("Method must be called with either a FiveRegisterInstruction or RangeRegisterInstruction");
         }
     }
 
-    private String getInstance() throws IOException {
-        FiveRegisterInstruction instruction = (FiveRegisterInstruction) this.instruction;
-        return RegisterFormatter.getRegisterContents(codeItem, instruction.getRegisterD());
-    }
-
-    private String getRangeInstance() throws IOException {
-        RegisterRangeInstruction instruction = (RegisterRangeInstruction) this.instruction;
-        return RegisterFormatter.getRegisterContents(codeItem, instruction.getStartRegister());
-    }
-
-    private int getInstanceRegister() throws IOException {
-        FiveRegisterInstruction instruction = (FiveRegisterInstruction) this.instruction;
-        return instruction.getRegisterD();
-    }
-
-    private int getRangeInstanceRegister() throws IOException {
-        RegisterRangeInstruction instruction = (RegisterRangeInstruction) this.instruction;
-        return instruction.getStartRegister();
+    private List<TypeIdItem> getMethodParameterTypes() {
+        MethodIdItem item = (MethodIdItem) ((InstructionWithReference) instruction).getReferencedItem();
+        return item.getPrototype().getParameterTypes();
     }
 
     private String getArrayType() {
         String arrayType = RegisterFormatter.getRegisterType(getSecondRegister());
         if (arrayType == null) {
-            System.err.println("NULL ARRAY. In method " + MethodDefinition.getName() + " in class " + ClassDefinition.getName());
+//            System.err.println("NULL ARRAY. In method " + MethodDefinition.getName() + " in class " + ClassDefinition.getName());
             return null;
         } else if (arrayType.length() < 2 || arrayType.charAt(0) != '[') {
-            System.err.println("Non array type parsed as array: " + arrayType + " In method " + MethodDefinition.getName() + " in class " + ClassDefinition.getName());
+//            System.err.println("Non array type parsed as array: " + arrayType + " In method " + MethodDefinition.getName() + " in class " + ClassDefinition.getName());
             return null;
-        }
+        } // Todo: Check why non-array types are being passed to this
         return arrayType.substring(1);
     }
 
-    private String getRegisterFromInstruction(FiveRegisterInstruction instruction, int register) {
+    private String getRegisterFromInstruction(InvokeInstruction instruction, int register, String dalvikType) {
         int registerNumber;
-        switch (register) {
-            case 0:
-                registerNumber = instruction.getRegisterD();
-                break;
-            case 1:
-                registerNumber = instruction.getRegisterE();
-                break;
-            case 2:
-                registerNumber = instruction.getRegisterF();
-                break;
-            case 3:
-                registerNumber = instruction.getRegisterG();
-                break;
-            case 4:
-                registerNumber = instruction.getRegisterA();
-                break;
-            default:
-                System.err.println("Register number must be a value between 0 and 4");
-                return "";
+
+        if (instruction instanceof FiveRegisterInstruction) {
+            FiveRegisterInstruction fiveReg = (FiveRegisterInstruction) instruction;
+            switch (register) {
+                case 0:
+                    registerNumber = fiveReg.getRegisterD();
+                    break;
+                case 1:
+                    registerNumber = fiveReg.getRegisterE();
+                    break;
+                case 2:
+                    registerNumber = fiveReg.getRegisterF();
+                    break;
+                case 3:
+                    registerNumber = fiveReg.getRegisterG();
+                    break;
+                case 4:
+                    registerNumber = fiveReg.getRegisterA();
+                    break;
+                default:
+                    System.err.println("Register number must be a value between 0 and 4");
+                    return "";
+            }
+        } else if (instruction instanceof RegisterRangeInstruction) {
+            RegisterRangeInstruction rangeReg = (RegisterRangeInstruction) instruction;
+            registerNumber = rangeReg.getStartRegister() + register;
+        } else {
+            throw new RuntimeException("Method must be called with either a FiveRegisterInstruction or RangeRegisterInstruction");
         }
-        return RegisterFormatter.getRegisterContents(codeItem, registerNumber);
+        return RegisterFormatter.getRegisterContents(codeItem, registerNumber, dalvikType);
     }
 }
