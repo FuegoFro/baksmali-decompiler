@@ -3,7 +3,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <groupId>org.jf</groupId>
-    <artifactId>smali-pom</artifactId>
+    <artifactId>dalik-decompiler-pom</artifactId>
     <version>1.0-SNAPSHOT</version>
     <packaging>pom</packaging>
     <properties>
@@ -23,10 +23,7 @@
     </build>
     <modules>
         <module>dexlib</module>
-        <module>smali</module>
         <module>baksmali</module>
         <module>util</module>
-        <module>maven-smali-plugin</module>
-        <module>smali-integration-tests</module>
     </modules>
 </project>
