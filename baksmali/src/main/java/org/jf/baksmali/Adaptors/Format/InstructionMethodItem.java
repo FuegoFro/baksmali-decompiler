@@ -94,8 +94,10 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
                 return true;
             }
         } else if (value == 0x0d) { // move-exception
-            return setFirstRegisterContents(writer, "caught-exception", "Ljava/lang/Exception;");
-            //Todo: How to handle this properly? Might have to wait for proper try/catch
+            return setFirstRegisterContents(writer, "0", "Ljava/lang/Exception;");
+            //Todo: This is a temporary solution to produce 'valid' java code.
+            //      The local variable actually stores the caught exception rather than null.
+            //      This might have to wait for actual try/catch to be done properly
         } else if (value == 0x0e) { // return-void
             writeOpcode(writer);
             writer.write(";\n\n");
