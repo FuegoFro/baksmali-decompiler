@@ -185,7 +185,7 @@ public class MethodDefinition {
                 writer.write('\n');
 
                 for (MethodItem methodItem : getMethodItems()) {
-                    if (methodItem.writeTo(writer)) {
+                    if (methodItem.write(writer)) {
                         writer.write(";\n");
                     }
                 }

@@ -45,9 +45,8 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
     protected final CodeItem codeItem;
     protected final T instruction;
 
-    private static String previousMethodCall = null;
-    private static String previousMethodCallReturnType = null;
-    private static String previousNonPrintingInstruction = null;
+
+    private static String previousNonPrintingAssignment = null;
     private static int returnedReg;
     private static String returnLabel;
 
@@ -64,17 +63,16 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
         return 100;
     }
 
+    public short getValue() {
+        return instruction.opcode.value;
+    }
+
     @Override
     public boolean writeTo(IndentingWriter writer) throws IOException {
-        short value = instruction.opcode.value;
-        if (previousMethodCall != null && !(value >= 0x0a && value <= 0x0d)) {
-            writer.write(previousMethodCall);
-            writer.write(";\n");
-            previousMethodCall = null;
-            previousMethodCallReturnType = null;
-        }
-        if (previousNonPrintingInstruction != null && !(value >= 0x028 && value <= 0x02a)) {
-            previousNonPrintingInstruction = null;
+        short value = getValue();
+
+        if (previousNonPrintingAssignment != null && !(value >= 0x028 && value <= 0x02a)) {
+            previousNonPrintingAssignment = null;
         }
 
         if (value >= 0x01 && value <= 0x09) { //moves
@@ -189,8 +187,8 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
                 }
                 writer.write(";\n\n");
             } else {
-                if (previousNonPrintingInstruction != null) {
-                    writer.write(previousNonPrintingInstruction);
+                if (previousNonPrintingAssignment != null) {
+                    writer.write(previousNonPrintingAssignment);
                     writer.write(";\n");
                 }
                 writer.write("//");
@@ -410,7 +408,7 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
             writer.write(contents);
             return true;
         } else {
-            previousNonPrintingInstruction = RegisterFormatter.getRegisterName(codeItem, register) + " = " + contents;
+            previousNonPrintingAssignment = RegisterFormatter.getRegisterName(codeItem, register) + " = " + contents;
             RegisterFormatter.setRegisterContents(register, contents, type);
             return false;
         }

@@ -28,12 +28,16 @@
 
 package org.jf.baksmali.Adaptors;
 
+import org.jf.baksmali.Adaptors.Format.InstructionMethodItem;
 import org.jf.util.IndentingWriter;
 
 import java.io.IOException;
 
 public abstract class MethodItem implements Comparable<MethodItem> {
     protected final int codeAddress;
+
+    protected static String previousMethodCall = null;
+    protected static String previousMethodCallReturnType = null;
 
     protected MethodItem(int codeAddress) {
         this.codeAddress = codeAddress;
@@ -49,11 +53,32 @@ public abstract class MethodItem implements Comparable<MethodItem> {
     public int compareTo(MethodItem methodItem) {
         int result = ((Integer) codeAddress).compareTo(methodItem.codeAddress);
 
-        if (result == 0){
-            return ((Double)getSortOrder()).compareTo(methodItem.getSortOrder());
+        if (result == 0) {
+            return ((Double) getSortOrder()).compareTo(methodItem.getSortOrder());
         }
         return result;
     }
 
     public abstract boolean writeTo(IndentingWriter writer) throws IOException;
+
+    public boolean write(IndentingWriter writer) throws IOException {
+        flushMethodCall(writer);
+        return writeTo(writer);
+    }
+
+    private void flushMethodCall(IndentingWriter writer) throws IOException {
+        if (previousMethodCall == null) {
+            return;
+        }
+        if (this instanceof InstructionMethodItem) {
+            short value = ((InstructionMethodItem) this).getValue();
+            if ((value >= 0x0a && value <= 0x0d)) {
+                return;
+            }
+        }
+        writer.write(previousMethodCall);
+        writer.write(";\n");
+        previousMethodCall = null;
+        previousMethodCallReturnType = null;
+    }
 }
