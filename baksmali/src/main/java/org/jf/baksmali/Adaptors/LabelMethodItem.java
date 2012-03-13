@@ -28,14 +28,16 @@
 
 package org.jf.baksmali.Adaptors;
 
-import org.jf.util.IndentingWriter;
 import org.jf.baksmali.baksmali;
+import org.jf.util.IndentingWriter;
 
 import java.io.IOException;
 
 public class LabelMethodItem extends MethodItem {
     private final String labelPrefix;
     private int labelSequence;
+
+    public static String lastLabel;
 
     public LabelMethodItem(int codeAddress, String labelPrefix) {
         super(codeAddress);
@@ -51,7 +53,7 @@ public class LabelMethodItem extends MethodItem {
 
         if (result == 0) {
             if (methodItem instanceof LabelMethodItem) {
-                result = labelPrefix.compareTo(((LabelMethodItem)methodItem).labelPrefix);
+                result = labelPrefix.compareTo(((LabelMethodItem) methodItem).labelPrefix);
             }
         }
         return result;
@@ -66,18 +68,22 @@ public class LabelMethodItem extends MethodItem {
         if (!(o instanceof LabelMethodItem)) {
             return false;
         }
-        return this.compareTo((MethodItem)o) == 0;
+        return this.compareTo((MethodItem) o) == 0;
     }
 
+    public String get() {
+        String label = "//" + labelPrefix;
+        if (baksmali.useSequentialLabels) {
+            label += Long.toHexString(labelSequence);
+        } else {
+            label += Long.toHexString(this.getLabelAddress());
+        }
+        lastLabel = label;
+        return label;
+    }
 
     public boolean writeTo(IndentingWriter writer) throws IOException {
-        writer.write("//");
-        writer.write(labelPrefix);
-        if (baksmali.useSequentialLabels) {
-            writer.printUnsignedLongAsHex(labelSequence);
-        } else {
-            writer.printUnsignedLongAsHex(this.getLabelAddress());
-        }
+        writer.write(get());
         return true;
     }
 

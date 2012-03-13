@@ -59,7 +59,7 @@ public class RegisterFormatter {
     }
 
     public static String getRegisterContents(CodeItem codeItem, int register) {
-        return getRegisterContents(codeItem, register, "I");
+        return getRegisterContents(codeItem, register, registerTypes[register]);
     }
 
     public static String getRegisterContents(CodeItem codeItem, int register, String suggestedDalvikType) {

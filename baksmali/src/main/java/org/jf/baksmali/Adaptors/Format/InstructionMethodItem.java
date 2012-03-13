@@ -48,12 +48,15 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
     private static String previousMethodCall = null;
     private static String previousMethodCallReturnType = null;
     private static String previousNonPrintingInstruction = null;
-
+    private static int returnedReg;
+    private static String returnLabel;
 
     public InstructionMethodItem(CodeItem codeItem, int codeAddress, T instruction) {
         super(codeAddress);
         this.codeItem = codeItem;
         this.instruction = instruction;
+        returnedReg = -1;
+        returnLabel = null;
     }
 
     public double getSortOrder() {
@@ -95,17 +98,18 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
             //Todo: How to handle this properly? Might have to wait for proper try/catch
         } else if (value == 0x0e) { // return-void
             writeOpcode(writer);
-            return true;
+            writer.write(";\n\n");
+            returnLabel = LabelMethodItem.lastLabel;
+            returnedReg = -1;
+            return false;
         } else if (value >= 0xf && value <= 0x011) { //return value
             writeOpcode(writer);
             writer.write(' ');
             writeFirstRegister(writer, MethodDefinition.getDalvikReturnType());
-            int register = getFirstRegister();
-            if (!RegisterFormatter.isLocal(register)) {
-                writer.write("; //return ");
-                writer.write(RegisterFormatter.getRegisterName(codeItem, register));
-            }
-            return true;
+            writer.write(";\n\n");
+            returnedReg = getFirstRegister();
+            returnLabel = LabelMethodItem.lastLabel;
+            return false;
         } else if (value >= 0x012 && value <= 0x019) { //const primitive
             String literal = getLiteral();
             String type = NUMBER;
@@ -174,15 +178,25 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
             writeFirstRegister(writer, OBJECT);
             return true;
         } else if (value >= 0x028 && value <= 0x02a) { //goto
-            if (previousNonPrintingInstruction != null) {
-                writer.write(previousNonPrintingInstruction);
-                writer.write(";\n");
+            String label = getTargetLabel();
+            if (label.equals(returnLabel)) {
+                writer.write("return");
+                if (returnedReg >= 0) {
+                    writer.write(' ');
+                    writer.write(RegisterFormatter.getRegisterContents(codeItem, returnedReg, MethodDefinition.getDalvikReturnType()));
+                }
+                writer.write(";\n\n");
+            } else {
+                if (previousNonPrintingInstruction != null) {
+                    writer.write(previousNonPrintingInstruction);
+                    writer.write(";\n");
+                }
+                writer.write("//");
+                writeOpcode(writer);
+                writer.write(' ');
+                writeTargetLabel(writer);
+                writer.write("\n\n");
             }
-            writer.write("//");
-            writeOpcode(writer);
-            writer.write(' ');
-            writeTargetLabel(writer);
-            writer.write("\n\n");
             return false;
         } else if (value >= 0x02b && value <= 0x02c) {
             // Todo: Skipped packed and sparse switch opcodes
@@ -347,6 +361,10 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
     }
 
     protected void writeTargetLabel(IndentingWriter writer) throws IOException {
+        writer.write(getTargetLabel());
+    }
+
+    protected String getTargetLabel() throws IOException {
         //this method is overrided by OffsetInstructionMethodItem, and should only be called for the formats that
         //have a target
         throw new RuntimeException();
