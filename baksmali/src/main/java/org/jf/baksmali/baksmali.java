@@ -144,7 +144,7 @@ public class baksmali {
         ArrayList<ClassDefItem> classDefItems = new ArrayList<ClassDefItem>(dexFile.ClassDefsSection.getItems());
         Collections.sort(classDefItems, new Comparator<ClassDefItem>() {
             public int compare(ClassDefItem classDefItem1, ClassDefItem classDefItem2) {
-                return classDefItem1.getClassType().getTypeDescriptor().compareTo(classDefItem1.getClassType().getTypeDescriptor());
+                return classDefItem1.getClassType().getTypeDescriptor().compareTo(classDefItem2.getClassType().getTypeDescriptor());
             }
         });
 

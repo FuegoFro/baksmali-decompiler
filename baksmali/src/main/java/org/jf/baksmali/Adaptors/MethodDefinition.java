@@ -159,7 +159,12 @@ public class MethodDefinition {
 
         writeAccessFlags(writer, encodedMethod);
         if (AccessFlags.hasFlag(encodedMethod.accessFlags, AccessFlags.CONSTRUCTOR)) {
-            writer.write(TypeFormatter.getType(encodedMethod.method.getContainingClass()));
+            String className = TypeFormatter.getType(encodedMethod.method.getContainingClass());
+            int lastPeriod = className.lastIndexOf('.');
+            if (lastPeriod >= 0) {
+                className = className.substring(lastPeriod + 1);
+            }
+            writer.write(className);
         } else {
             if (!SignatureFormatter.writeSignature(writer, annotationSet, SignatureFormatter.Origin.Method)) {
                 writer.write(TypeFormatter.getType(returnType));

@@ -40,6 +40,7 @@ import org.jf.util.IndentingWriter;
 import org.jf.util.MemoryWriter;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 
@@ -61,6 +62,17 @@ public class ClassDefinition {
     private static String javaClassName = "";
     private static String superClass = "";
     private boolean wroteSignature = false;
+    public static boolean isInnerClass = false;
+    private int innerClassAccessFlags = 0;
+    private boolean isAnonymous = false;
+
+    // Stores inner classes in memory to be added to enclosing classes
+    // Key is dalvik type of inner class, value is class contents
+    private static HashMap<String, String> innerClasses = new HashMap<String, String>();
+
+    // Stores inner class' imports to be joined with enclosing class's imports
+    // Key is dalvik type of inner class, value is imports set
+    private static HashMap<String, HashSet<String>> innerClassImports = new HashMap<String, HashSet<String>>();
 
     public ClassDefinition(ClassDefItem classDefItem) {
         this.classDefItem = classDefItem;
@@ -176,19 +188,58 @@ public class ClassDefinition {
         return javaClassName;
     }
 
+    private void parseInnerClassDetails() {
+        isInnerClass = false;
+        innerClassAccessFlags = 0;
+        isAnonymous = false;
+
+        AnnotationItem[] annotations = getClassAnnotations();
+        for (AnnotationItem annotation : annotations) {
+            AnnotationEncodedSubValue encodedAnnotation = annotation.getEncodedAnnotation();
+            if (encodedAnnotation.annotationType.getTypeDescriptor().equals("Ldalvik/annotation/InnerClass;")) {
+                isInnerClass = true;
+                innerClassAccessFlags = ((IntEncodedValue) encodedAnnotation.values[0]).value;
+                if (encodedAnnotation.values[1].getValueType().equals(ValueType.VALUE_NULL)) {
+                    isAnonymous = true;
+                }
+            }
+        }
+    }
+
+    private AnnotationItem[] getClassAnnotations() {
+        AnnotationDirectoryItem annotationDirectoryItem = classDefItem.getAnnotations();
+        if (annotationDirectoryItem == null) {
+            return new AnnotationItem[0];
+        }
+
+        AnnotationSetItem classAnnotations = annotationDirectoryItem.getClassAnnotations();
+        if (classAnnotations == null) {
+            return new AnnotationItem[0];
+        }
+
+        return classAnnotations.getAnnotations();
+    }
+
     /* The majority of the file is written to memory first because in order to
        know and write the imports we have to process the entire file. Thus, the
        body of the file is only written at the end.
      */
     public void writeTo(IndentingWriter writer) throws IOException {
+        imports = new HashSet<String>();
+        parseInnerClassDetails();
+
         MemoryWriter body = new MemoryWriter();
         writeBody(new IndentingWriter(body));
-        writeBase(writer);
-        writer.write(body.getContents());
+        if (isInnerClass) {
+            innerClasses.put(dalvikClassName, body.getContents());
+            innerClassImports.put(dalvikClassName, imports);
+        } else {
+            writeBase(writer);
+            writer.write(body.getContents());
+        }
     }
 
     private void writeBody(IndentingWriter writer) throws IOException {
-        imports = new HashSet<String>();
         writeClass(writer);
         if (!wroteSignature) {
             writeSuper(writer);
@@ -201,6 +252,7 @@ public class ClassDefinition {
         writeInstanceFields(writer);
         writeDirectMethods(writer);
         writeVirtualMethods(writer);
+        writeInnerClasses(writer);
         writer.deindent(4);
         writer.write("}");
     }
@@ -235,7 +287,12 @@ public class ClassDefinition {
         }
         dalvikClassName = classDefItem.getClassType().getTypeDescriptor();
         javaClassName = TypeFormatter.getFullType(classDefItem.getClassType());
-        String descriptor = TypeFormatter.getType(classDefItem.getClassType());
+
+        String descriptor = javaClassName;
+        int lastDollarSign = descriptor.lastIndexOf('$');
+        if (lastDollarSign >= 0) {
+            descriptor = descriptor.substring(lastDollarSign + 1);
+        }
         writer.write(descriptor);
 
         AnnotationDirectoryItem annotationDirectory = classDefItem.getAnnotations();
@@ -251,7 +308,11 @@ public class ClassDefinition {
 
     private void writeAccessFlags(IndentingWriter writer) throws IOException {
         isInterface = AccessFlags.hasFlag(classDefItem.getAccessFlags(), AccessFlags.INTERFACE);
-        for (AccessFlags accessFlag : AccessFlags.getAccessFlagsForClass(classDefItem.getAccessFlags())) {
+        int classAccessFlags = classDefItem.getAccessFlags();
+        if (isInnerClass) {
+            classAccessFlags = innerClassAccessFlags;
+        }
+        for (AccessFlags accessFlag : AccessFlags.getAccessFlagsForClass(classAccessFlags)) {
             if (accessFlag.equals(AccessFlags.PUBLIC) ||
                     accessFlag.equals(AccessFlags.FINAL) ||
                     accessFlag.equals(AccessFlags.INTERFACE) ||
@@ -431,6 +492,26 @@ public class ClassDefinition {
                         method.method.getMethodString()));
                 validationException.printStackTrace(System.err);
                 this.validationErrors = true;
+            }
+        }
+    }
+
+    private void writeInnerClasses(IndentingWriter writer) throws IOException {
+        for (AnnotationItem annotation : getClassAnnotations()) {
+            AnnotationEncodedSubValue encodedAnnotation = annotation.getEncodedAnnotation();
+
+            if (encodedAnnotation.annotationType.getTypeDescriptor().equals("Ldalvik/annotation/MemberClasses;")) {
+                EncodedValue[] innerClassList = ((ArrayEncodedSubValue) encodedAnnotation.values[0]).values;
+                for (EncodedValue innerClass : innerClassList) {
+                    String innerClassName = ((TypeEncodedValue) innerClass).value.getTypeDescriptor();
+                    if (innerClasses.containsKey(innerClassName)) {
+                        writer.write('\n');
+                        writer.write(innerClasses.remove(innerClassName));
+                        writer.write('\n');
+
+                        imports.addAll(innerClassImports.remove(innerClassName));
+                    }
+                }
             }
         }
     }
