@@ -28,6 +28,7 @@
 
 package org.jf.baksmali.Adaptors;
 
+import org.jf.baksmali.InnerClass;
 import org.jf.dexlib.*;
 import org.jf.dexlib.Code.Analysis.ValidationException;
 import org.jf.dexlib.Code.Format.Instruction21c;
@@ -45,6 +46,7 @@ import java.util.HashSet;
 import java.util.List;
 
 public class ClassDefinition {
+    public static final String LJAVA_LANG_OBJECT = "Ljava/lang/Object;";
     private ClassDefItem classDefItem;
     private ClassDataItem classDataItem;
 
@@ -64,21 +66,22 @@ public class ClassDefinition {
     private boolean wroteSignature = false;
     public static boolean isInnerClass = false;
     private int innerClassAccessFlags = 0;
-    private boolean isAnonymous = false;
+    private static boolean isAnonymous = false;
 
     // Stores inner classes in memory to be added to enclosing classes
     // Key is dalvik type of inner class, value is class contents
-    private static HashMap<String, String> innerClasses = new HashMap<String, String>();
-
-    // Stores inner class' imports to be joined with enclosing class's imports
-    // Key is dalvik type of inner class, value is imports set
-    private static HashMap<String, HashSet<String>> innerClassImports = new HashMap<String, HashSet<String>>();
+    private static HashMap<String, InnerClass> innerClasses = new HashMap<String, InnerClass>();
+    private List<TypeIdItem> interfaces;
 
     public ClassDefinition(ClassDefItem classDefItem) {
         this.classDefItem = classDefItem;
         this.classDataItem = classDefItem.getClassData();
         buildAnnotationMaps();
         findFieldsSetInStaticConstructor();
+    }
+
+    public static boolean isAnonymous() {
+        return isAnonymous;
     }
 
     public boolean hadValidationErrors() {
@@ -168,6 +171,10 @@ public class ClassDefinition {
         }
     }
 
+    public static void addImport(HashSet<String> newImports) {
+        imports.addAll(newImports);
+    }
+
     public static boolean isSuper(String dalvikClassDescription) {
         return superClass.equals(dalvikClassDescription);
     }
@@ -186,6 +193,10 @@ public class ClassDefinition {
 
     public static String getName() {
         return javaClassName;
+    }
+
+    public static HashMap<String, InnerClass> getInnerClasses() {
+        return innerClasses;
     }
 
     private void parseInnerClassDetails() {
@@ -220,6 +231,32 @@ public class ClassDefinition {
         return classAnnotations.getAnnotations();
     }
 
+    private void setClassName() {
+        dalvikClassName = classDefItem.getClassType().getTypeDescriptor();
+        javaClassName = TypeFormatter.getFullType(classDefItem.getClassType());
+    }
+
+    private void setSuper() {
+        TypeIdItem superClass = classDefItem.getSuperclass();
+        if (superClass != null) {
+            ClassDefinition.superClass = superClass.getTypeDescriptor();
+        }
+    }
+
+    private void setInterfaces() {
+        this.interfaces = null;
+        TypeListItem interfaceList = classDefItem.getInterfaces();
+        if (interfaceList == null) {
+            return;
+        }
+
+        List<TypeIdItem> interfaces = interfaceList.getTypes();
+        if (interfaces == null || interfaces.size() == 0) {
+            return;
+        }
+        this.interfaces = interfaces;
+    }
+
     /* The majority of the file is written to memory first because in order to
        know and write the imports we have to process the entire file. Thus, the
        body of the file is only written at the end.
@@ -231,19 +268,34 @@ public class ClassDefinition {
         MemoryWriter body = new MemoryWriter();
         writeBody(new IndentingWriter(body));
         if (isInnerClass) {
-            innerClasses.put(dalvikClassName, body.getContents());
-            innerClassImports.put(dalvikClassName, imports);
+            innerClasses.put(dalvikClassName, makeInnerClass(body));
         } else {
             writeBase(writer);
             writer.write(body.getContents());
         }
     }
 
+    private InnerClass makeInnerClass(MemoryWriter body) {
+        InnerClass innerClass;
+        if (isAnonymous) {
+            String anonBase = superClass.equals(LJAVA_LANG_OBJECT) ? interfaces.get(0).getTypeDescriptor() : superClass;
+            innerClass = new InnerClass(body, anonBase, imports);
+        } else {
+            innerClass = new InnerClass(body, imports);
+        }
+        return innerClass;
+    }
+
     private void writeBody(IndentingWriter writer) throws IOException {
-        writeClass(writer);
-        if (!wroteSignature) {
-            writeSuper(writer);
-            writeInterfaces(writer);
+        setClassName();
+        setSuper();
+        setInterfaces();
+        if (!isAnonymous) {
+            writeClass(writer);
+            if (!wroteSignature) {
+                writeSuper(writer);
+                writeInterfaces(writer);
+            }
         }
         writer.write(" {");
         writer.indent(4);
@@ -285,11 +337,9 @@ public class ClassDefinition {
         if (!isInterface) {
             writer.write("class ");
         }
-        dalvikClassName = classDefItem.getClassType().getTypeDescriptor();
-        javaClassName = TypeFormatter.getFullType(classDefItem.getClassType());
 
         String descriptor = javaClassName;
-        int lastDollarSign = descriptor.lastIndexOf('$');
+        int lastDollarSign = descriptor.lastIndexOf('.');
         if (lastDollarSign >= 0) {
             descriptor = descriptor.substring(lastDollarSign + 1);
         }
@@ -324,30 +374,20 @@ public class ClassDefinition {
     }
 
     private void writeSuper(IndentingWriter writer) throws IOException {
-        TypeIdItem superClass = classDefItem.getSuperclass();
-        if (superClass != null) {
-            ClassDefinition.superClass = superClass.getTypeDescriptor();
-            if (!superClass.getTypeDescriptor().equals("Ljava/lang/Object;")) {
-                writer.write(" extends ");
-                writer.write(TypeFormatter.getType(superClass));
-            }
+        if (superClass != null && !superClass.equals(LJAVA_LANG_OBJECT)) {
+            writer.write(" extends ");
+            writer.write(TypeFormatter.getType(superClass));
         }
     }
 
     private void writeInterfaces(IndentingWriter writer) throws IOException {
-        TypeListItem interfaceList = classDefItem.getInterfaces();
-        if (interfaceList == null) {
-            return;
-        }
-
-        List<TypeIdItem> interfaces = interfaceList.getTypes();
-        if (interfaces == null || interfaces.size() == 0) {
+        if (interfaces == null) {
             return;
         }
 
         writer.write(" implements ");
         boolean firstTime = true;
-        for (TypeIdItem typeIdItem : interfaceList.getTypes()) {
+        for (TypeIdItem typeIdItem : interfaces) {
             if (!firstTime) {
                 writer.write(", ");
             }
@@ -505,11 +545,12 @@ public class ClassDefinition {
                 for (EncodedValue innerClass : innerClassList) {
                     String innerClassName = ((TypeEncodedValue) innerClass).value.getTypeDescriptor();
                     if (innerClasses.containsKey(innerClassName)) {
+                        InnerClass namedInnerClass = innerClasses.remove(innerClassName);
                         writer.write('\n');
-                        writer.write(innerClasses.remove(innerClassName));
+                        writer.write(namedInnerClass.getBody());
                         writer.write('\n');
 
-                        imports.addAll(innerClassImports.remove(innerClassName));
+                        imports.addAll(namedInnerClass.getImports());
                     }
                 }
             }

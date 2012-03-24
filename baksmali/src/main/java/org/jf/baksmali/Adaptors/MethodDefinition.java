@@ -147,7 +147,8 @@ public class MethodDefinition {
         returnType = encodedMethod.method.getPrototype().getReturnType();
 
         //don't print synthetic methods
-        if (AccessFlags.hasFlag(encodedMethod.accessFlags, AccessFlags.SYNTHETIC)) {
+        if (AccessFlags.hasFlag(encodedMethod.accessFlags, AccessFlags.SYNTHETIC) ||
+                (ClassDefinition.isAnonymous() && AccessFlags.hasFlag(encodedMethod.accessFlags, AccessFlags.CONSTRUCTOR))) {
             return;
         }
 

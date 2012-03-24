@@ -29,6 +29,7 @@
 package org.jf.baksmali.Adaptors.Format;
 
 import org.jf.baksmali.Adaptors.*;
+import org.jf.baksmali.InnerClass;
 import org.jf.dexlib.*;
 import org.jf.dexlib.Code.*;
 import org.jf.dexlib.Util.AccessFlags;
@@ -36,12 +37,15 @@ import org.jf.util.IndentingWriter;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.regex.Pattern;
 
 public class InstructionMethodItem<T extends Instruction> extends MethodItem {
     public static final String NUMBER = "I";
     public static final String BOOLEAN = "Z";
     public static final String OBJECT = "L;";
+    private static final Pattern ANONYMOUS_CLASS = Pattern.compile("\\$\\d+;$");
     protected final CodeItem codeItem;
     protected final T instruction;
 
@@ -340,7 +344,12 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
                 previousMethodCall = "this" + invocation;
             } else {
                 previousMethodCallReturnType = null;
-                return setRegisterContents(writer, instanceRegister, "new " + getReference(false) + invocation, getReferenceType());
+                String dalvikClassName = getReference(false);
+                String contents = getAnonymousMethod(dalvikClassName);
+                if (contents == null) {
+                    contents = "new " + TypeFormatter.getType(dalvikClassName) + invocation;
+                }
+                return setRegisterContents(writer, instanceRegister, contents, getReferenceType());
             }
         } else {
             previousMethodCall = getReference(false) + invocation;
@@ -349,6 +358,22 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
             }
         }
         return false;
+    }
+
+    private String getAnonymousMethod(String dalvikClassName) {
+        if (ANONYMOUS_CLASS.matcher(dalvikClassName).find()) {
+            HashMap<String, InnerClass> innerClasses = ClassDefinition.getInnerClasses();
+            InnerClass innerClass = innerClasses.get(dalvikClassName);
+
+            if (innerClass != null && innerClass.isAnonymous()) {
+                innerClasses.remove(dalvikClassName);
+                ClassDefinition.addImport(innerClass.getImports());
+
+                String prettyBaseName = TypeFormatter.getType(innerClass.getSuperClass());
+                return "new " + prettyBaseName + "() " + innerClass.getBody();
+            }
+        }
+        return null;
     }
 
     private boolean isConstructor() {

@@ -45,7 +45,11 @@ public class AnnotationFormatter {
                 writer.write('\n');
             }
             first = false;
-            if (!annotationItem.getEncodedAnnotation().annotationType.getTypeDescriptor().equals("Ldalvik/annotation/Signature;")) {
+            String typeDescriptor = annotationItem.getEncodedAnnotation().annotationType.getTypeDescriptor();
+            if (!(typeDescriptor.equals("Ldalvik/annotation/Signature;") ||
+                    typeDescriptor.equals("Ldalvik/annotation/MemberClass;") ||
+                    typeDescriptor.equals("Ldalvik/annotation/EnclosingClass;") ||
+                    typeDescriptor.equals("Ldalvik/annotation/InnerClass;"))) {
                 writeTo(writer, annotationItem);
             }
         }

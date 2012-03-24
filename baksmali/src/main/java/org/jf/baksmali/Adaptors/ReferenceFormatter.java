@@ -68,7 +68,7 @@ public class ReferenceFormatter {
     public static String getMethodReference(MethodIdItem item, boolean isStaticReference) {
         String methodName = item.getMethodName().getStringValue();
         if (methodName.equals("<init>") || methodName.equals("<clinit>")) {
-            return TypeFormatter.getType(item.getContainingClass());
+            return item.getContainingClass().getTypeDescriptor();
         } else if (isStaticReference) {
             return TypeFormatter.getType(item.getContainingClass()) + "." + methodName;
         }
