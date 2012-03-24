@@ -261,7 +261,7 @@ public class ClassDefinition {
        know and write the imports we have to process the entire file. Thus, the
        body of the file is only written at the end.
      */
-    public void writeTo(IndentingWriter writer) throws IOException {
+    public boolean writeTo(IndentingWriter writer) throws IOException {
         imports = new HashSet<String>();
         parseInnerClassDetails();
 
@@ -269,9 +269,11 @@ public class ClassDefinition {
         writeBody(new IndentingWriter(body));
         if (isInnerClass) {
             innerClasses.put(dalvikClassName, makeInnerClass(body));
+            return false;
         } else {
             writeBase(writer);
             writer.write(body.getContents());
+            return true;
         }
     }
 

@@ -177,6 +177,7 @@ public class MethodDefinition {
 
 
         if (AccessFlags.hasFlag(encodedMethod.accessFlags, AccessFlags.NATIVE) ||
+                AccessFlags.hasFlag(encodedMethod.accessFlags, AccessFlags.ABSTRACT) ||
                 ClassDefinition.isInterface()) {
             writer.write(";\n");
         } else {

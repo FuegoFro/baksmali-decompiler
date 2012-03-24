@@ -210,7 +210,11 @@ public class baksmali {
                         new FileOutputStream(javaFile), "UTF8"));
                 writer = new IndentingWriter(baseBufWriter);
 
-                classDefinition.writeTo((IndentingWriter) writer);
+                boolean didWrite = classDefinition.writeTo((IndentingWriter) writer);
+
+                if (!didWrite) {
+                    javaFile.delete();
+                }
             } catch (Exception ex) {
                 System.err.println("\n\nError occured while disassembling class " + classDescriptor.replace('/', '.') + " - skipping class");
                 ex.printStackTrace();
