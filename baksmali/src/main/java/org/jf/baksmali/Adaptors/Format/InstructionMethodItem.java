@@ -212,16 +212,8 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
             writeTargetLabel(writer);
             return true;
         } else if (value >= 0x02d && value <= 0x031) {
-            // Todo: Skipped compares
-            writer.write("//");
-            writeOpcode(writer);
-            writer.write(' ');
-            writeFirstRegister(writer);
-            writer.write(", ");
-            writeSecondRegister(writer);
-            writer.write(", ");
-            writeThirdRegister(writer);
-            return true;
+            String compareResult = getSecondRegisterContents() + " - " + getThirdRegisterContents();
+            return setFirstRegisterContents(writer, compareResult, NUMBER);
         } else if (value >= 0x032 && value <= 0x037) { //if compare to reg
             writer.write("if (");
             writeFirstRegister(writer);
