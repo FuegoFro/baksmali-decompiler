@@ -63,7 +63,6 @@ public class ClassDefinition {
     private static String dalvikClassName = "";
     private static String javaClassName = "";
     private static String superClass = "";
-    private boolean wroteSignature = false;
     public static boolean isInnerClass = false;
     private int innerClassAccessFlags = 0;
     private static boolean isAnonymous = false;
@@ -293,8 +292,7 @@ public class ClassDefinition {
         setSuper();
         setInterfaces();
         if (!isAnonymous) {
-            writeClass(writer);
-            if (!wroteSignature) {
+            if (!writeClass(writer)) {
                 writeSuper(writer);
                 writeInterfaces(writer);
             }
@@ -334,25 +332,27 @@ public class ClassDefinition {
         writer.write('\n');
     }
 
-    private void writeClass(IndentingWriter writer) throws IOException {
+    private boolean writeClass(IndentingWriter writer) throws IOException {
         writeAccessFlags(writer);
         if (!isInterface) {
             writer.write("class ");
         }
 
         String descriptor = javaClassName;
-        int lastDollarSign = descriptor.lastIndexOf('.');
-        if (lastDollarSign >= 0) {
-            descriptor = descriptor.substring(lastDollarSign + 1);
+        int lastPeriod = descriptor.lastIndexOf('.');
+        int lastDollarSign = descriptor.lastIndexOf('$');
+        int beginningOfName = lastPeriod > lastDollarSign ? lastPeriod : lastDollarSign;
+        if (beginningOfName >= 0) {
+            descriptor = descriptor.substring(beginningOfName + 1);
         }
         writer.write(descriptor);
 
         AnnotationDirectoryItem annotationDirectory = classDefItem.getAnnotations();
         if (annotationDirectory == null) {
-            return;
+            return false;
         }
 
-        wroteSignature = SignatureFormatter.writeSignature(
+        return SignatureFormatter.writeSignature(
                 writer,
                 annotationDirectory.getClassAnnotations(),
                 SignatureFormatter.Origin.Class);
