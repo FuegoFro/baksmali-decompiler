@@ -28,6 +28,7 @@
 
 package org.jf.baksmali.Adaptors;
 
+import org.jf.baksmali.Parenthesizer;
 import org.jf.baksmali.baksmali;
 import org.jf.dexlib.CodeItem;
 import org.jf.dexlib.Util.AccessFlags;
@@ -75,7 +76,7 @@ public class RegisterFormatter {
                         prettyString.append(" + ");
                     }
                     first = false;
-                    prettyString.append(subString);
+                    prettyString.append(Parenthesizer.ensureNoUnenclosedSpaces(subString));
                 }
                 return prettyString.toString();
             }

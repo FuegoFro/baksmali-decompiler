@@ -30,8 +30,9 @@ package org.jf.baksmali.Adaptors.Format;
 
 import org.jf.baksmali.Adaptors.*;
 import org.jf.baksmali.InnerClass;
-import org.jf.dexlib.*;
+import org.jf.baksmali.Parenthesizer;
 import org.jf.dexlib.Code.*;
+import org.jf.dexlib.*;
 import org.jf.dexlib.Util.AccessFlags;
 import org.jf.util.IndentingWriter;
 
@@ -131,17 +132,21 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
             writeFirstRegister(writer);
             return true;
         } else if (value == 0x01f) { //check-cast
-            return setFirstRegisterContents(writer, "(" + getReference(false) + ") " + getFirstRegisterContents(), getReferenceType());
+            String contents = Parenthesizer.ensureNoUnenclosedSpaces(getFirstRegisterContents());
+            return setFirstRegisterContents(writer, "(" + getReference(false) + ") " + contents, getReferenceType());
         } else if (value == 0x020) { // instanceof
-            return setFirstRegisterContents(writer, getSecondRegisterContents() + " " + getOpcode() + " " + getReference(false), BOOLEAN);
+            String contents = Parenthesizer.ensureOrderOfOperations(getOpcode(), getSecondRegisterContents(), getReference(false));
+            return setFirstRegisterContents(writer, contents, BOOLEAN);
         } else if (value == 0x021) { //array-length
-            return setFirstRegisterContents(writer, getSecondRegisterContents() + getOpcode(), NUMBER);
+            String contents = Parenthesizer.ensureNoUnenclosedSpaces(getSecondRegisterContents());
+            return setFirstRegisterContents(writer, contents + getOpcode(), NUMBER);
         } else if (value == 0x022) { // new instance
             RegisterFormatter.clearRegisterContents(getFirstRegister());
             return false;
         } else if (value == 0x023) { // new-array
             String typeReference = getReference(false);
-            return setFirstRegisterContents(writer, "new " + typeReference.substring(0, typeReference.length() - 2) + "[" + getSecondRegisterContents() + "]", getReferenceType());
+            String contents = "new " + typeReference.substring(0, typeReference.length() - 2) + "[" + getSecondRegisterContents() + "]";
+            return setFirstRegisterContents(writer, contents, getReferenceType());
         } else if (value == 0x024) { // filled-new-array
             // Todo: Skipped filled-new-array opcodes
             int regCount = ((InvokeInstruction) instruction).getRegCount();
@@ -211,16 +216,12 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
             writer.write(", ");
             writeTargetLabel(writer);
             return true;
-        } else if (value >= 0x02d && value <= 0x031) {
-            String compareResult = getSecondRegisterContents() + " - " + getThirdRegisterContents();
+        } else if (value >= 0x02d && value <= 0x031) { // compare
+            String compareResult = Parenthesizer.ensureOrderOfOperations("-", getSecondRegisterContents(), getThirdRegisterContents());
             return setFirstRegisterContents(writer, compareResult, NUMBER);
         } else if (value >= 0x032 && value <= 0x037) { //if compare to reg
             writer.write("if (");
-            writeFirstRegister(writer);
-            writer.write(' ');
-            writeOpcode(writer);
-            writer.write(' ');
-            writeSecondRegister(writer);
+            writer.write(Parenthesizer.ensureOrderOfOperations(getOpcode(), getFirstRegisterContents(), getSecondRegisterContents()));
             writer.write(") {\n");
             writer.indent(4);
             writer.write("//goto ");
@@ -231,11 +232,9 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
             return false;
         } else if (value >= 0x038 && value <= 0x03d) { //if compare to zero
             writer.write("if (");
-            writeFirstRegister(writer);
-            writer.write(' ');
-            writeOpcode(writer);
             String zeroValue = TypeFormatter.zeroAs(RegisterFormatter.getRegisterType(getFirstRegister()));
-            writer.write(" " + zeroValue + ") {\n");
+            writer.write(Parenthesizer.ensureOrderOfOperations(getOpcode(), getFirstRegisterContents(), zeroValue));
+            writer.write(") {\n");
             writer.indent(4);
             writer.write("//goto ");
             writeTargetLabel(writer);
@@ -304,13 +303,14 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
         } else if ((value >= 0x06e && value <= 0x072) || (value >= 0x074 && value <= 0x078)) { //invoke(range) non-super non-static
             return invoke(writer);
         } else if (value >= 0x07b && value <= 0x08f) { //conversions
-            return setFirstRegisterContents(writer, getOpcode() + getSecondRegisterContents(), NUMBER);
+            String contents = Parenthesizer.ensureNoUnenclosedSpaces(getSecondRegisterContents());
+            return setFirstRegisterContents(writer, getOpcode() + contents, NUMBER);
         } else if (value >= 0x090 && value <= 0x0af) { //basic arithmetic
-            return setFirstRegisterContents(writer, getSecondRegisterContents() + " " + getOpcode() + " " + getThirdRegisterContents(), NUMBER);
+            return setFirstRegisterContents(writer, Parenthesizer.ensureOrderOfOperations(getOpcode(), getSecondRegisterContents(), getThirdRegisterContents()), NUMBER);
         } else if (value >= 0x0b0 && value <= 0x0cf) { //arithmetic, store in first
-            return setFirstRegisterContents(writer, getFirstRegisterContents() + " " + getOpcode() + " " + getSecondRegisterContents(), NUMBER);
+            return setFirstRegisterContents(writer, Parenthesizer.ensureOrderOfOperations(getOpcode(), getFirstRegisterContents(), getSecondRegisterContents()), NUMBER);
         } else if (value >= 0x0d0 && value <= 0x0e2) { //literal arithmetic
-            return setFirstRegisterContents(writer, getSecondRegisterContents() + " " + getOpcode() + " " + getLiteral(), NUMBER);
+            return setFirstRegisterContents(writer, Parenthesizer.ensureOrderOfOperations(getOpcode(), getSecondRegisterContents(), getLiteral()), NUMBER);
         } else {
             assert false;
             return false;
@@ -318,13 +318,11 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
     }
 
     private boolean invoke(IndentingWriter writer) throws IOException {
-        String instance;
-        int instanceRegister;
-        String invocation;
         List<TypeIdItem> parameterTypes = getMethodParameterTypes();
-        instanceRegister = getInstanceRegister();
-        instance = RegisterFormatter.getRegisterContents(codeItem, instanceRegister);
-        invocation = getInvocation(parameterTypes, false);
+        int instanceRegister = getInstanceRegister();
+        String instance = RegisterFormatter.getRegisterContents(codeItem, instanceRegister);
+        instance = Parenthesizer.ensureNoUnenclosedSpaces(instance);
+        String invocation = getInvocation(parameterTypes, false);
 
         previousMethodCallReturnType = getReferenceType();
         if (isConstructor()) {
