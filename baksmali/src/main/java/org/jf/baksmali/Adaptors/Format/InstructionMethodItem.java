@@ -42,6 +42,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.regex.Pattern;
 
+import static org.jf.dexlib.Code.Analysis.SyntheticAccessorResolver.*;
+
 public class InstructionMethodItem<T extends Instruction> extends MethodItem {
     public static final String NUMBER = "I";
     public static final String BOOLEAN = "Z";
@@ -294,6 +296,9 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
             if (value == 0x06f || value == 0x075) { // invoke super
                 previousMethodCall = "super.";
             } else { // invoke static
+                if (isAccessor()) {
+                    return handleAccessor(writer, parameterTypes);
+                }
                 isStatic = true;
                 previousMethodCall = "";
             }
@@ -570,5 +575,53 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
     private String getFieldClass() {
         FieldIdItem item = (FieldIdItem) ((InstructionWithReference) instruction).getReferencedItem();
         return TypeFormatter.getType(item.getContainingClass());
+    }
+
+    private boolean isAccessor() {
+        return getAccessedMember() != null;
+    }
+
+    private AccessedMember getAccessedMember() {
+        return ((MethodIdItem) ((InstructionWithReference) instruction).getReferencedItem()).getAccessedMember();
+    }
+
+    private boolean handleAccessor(IndentingWriter writer, List<TypeIdItem> parameterTypes) throws IOException {
+        AccessedMember member = getAccessedMember();
+        String firstArg = getRegisterFromInstruction((InvokeInstruction) instruction, 0, NUMBER);
+        String memberName = ReferenceFormatter.getReference(member.getAccessedMember(), false);
+        String memberType = ReferenceFormatter.getReferenceType(member.getAccessedMember());
+
+        switch (member.getAccessedMemberType()) {
+            case GETTER:
+//              Getter: Instance: first arg, Field: comment -> PrevMethod = first.comment
+                previousMethodCall = "";
+                if (!firstArg.equals("this$0")) {
+                    previousMethodCall = firstArg + ".";
+                }
+                previousMethodCall += memberName;
+                previousMethodCallReturnType = memberType;
+                return false;
+            case SETTER:
+//              Setter: Instance: first arg, Field: comment, Value: second arg -> print: first.comment = second, PrevMethod(Type) = null
+                String secondRegister = getRegisterFromInstruction((InvokeInstruction) instruction, 1, memberType);
+                if (!firstArg.equals("this$0")) {
+                    writer.write(firstArg);
+                    writer.write('.');
+                }
+                writer.write(memberName);
+                writer.write(" = ");
+                writer.write(secondRegister);
+                return true;
+            case METHOD:
+//              Calls: Instance: first arg, Method: comment, Args, rest of args -> PrevMethod = first.comment(rest)
+                previousMethodCall = "";
+                if (!firstArg.equals("this$0")) {
+                    previousMethodCall = firstArg + ".";
+                }
+                previousMethodCall += memberName + getInvocation(parameterTypes, false);
+                previousMethodCallReturnType = memberType;
+                return false;
+        }
+        return false;
     }
 }

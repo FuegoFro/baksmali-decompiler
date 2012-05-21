@@ -28,6 +28,7 @@
 
 package org.jf.dexlib;
 
+import org.jf.dexlib.Code.Analysis.SyntheticAccessorResolver;
 import org.jf.dexlib.Util.AnnotatedOutput;
 import org.jf.dexlib.Util.Input;
 
@@ -37,6 +38,8 @@ public class MethodIdItem extends Item<MethodIdItem> {
     private TypeIdItem classType;
     private ProtoIdItem methodPrototype;
     private StringIdItem methodName;
+
+    private SyntheticAccessorResolver.AccessedMember accessedMember;
 
     /**
      * Creates a new uninitialized <code>MethodIdItem</code>
@@ -248,5 +251,13 @@ public class MethodIdItem extends Item<MethodIdItem> {
         return (classType == other.classType &&
                 methodPrototype == other.methodPrototype &&
                 methodName == other.methodName);
+    }
+
+    public void setAccessedMember(SyntheticAccessorResolver.AccessedMember accessedMember) {
+        this.accessedMember = accessedMember;
+    }
+
+    public SyntheticAccessorResolver.AccessedMember getAccessedMember() {
+        return accessedMember;
     }
 }

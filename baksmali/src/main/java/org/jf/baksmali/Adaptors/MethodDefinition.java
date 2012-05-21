@@ -466,7 +466,7 @@ public class MethodDefinition {
                         SyntheticAccessorResolver.AccessedMember accessedMember =
                                 baksmali.syntheticAccessorResolver.getAccessedMember(methodIdItem);
                         if (accessedMember != null) {
-                            methodItems.add(new SyntheticAccessCommentMethodItem(accessedMember, currentCodeAddress));
+                            methodIdItem.setAccessedMember(accessedMember);
                         }
                     }
                 }
