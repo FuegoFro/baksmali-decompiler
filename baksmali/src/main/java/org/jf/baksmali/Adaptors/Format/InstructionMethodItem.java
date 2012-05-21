@@ -33,7 +33,6 @@ import org.jf.baksmali.InnerClass;
 import org.jf.baksmali.Parenthesizer;
 import org.jf.dexlib.Code.*;
 import org.jf.dexlib.*;
-import org.jf.dexlib.Util.AccessFlags;
 import org.jf.util.IndentingWriter;
 
 import java.io.IOException;
@@ -49,6 +48,7 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
     public static final String BOOLEAN = "Z";
     public static final String OBJECT = "L;";
     private static final Pattern ANONYMOUS_CLASS = Pattern.compile("\\$\\d+;$");
+    private static final Pattern THIS = Pattern.compile("([A-Za-z]\\.)?this");
     protected final CodeItem codeItem;
     protected final T instruction;
 
@@ -106,7 +106,9 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
         } else if (value == 0x0e) { // return-void
             writeOpcode(writer);
             writer.write(";\n\n");
-            returnLabel = LabelMethodItem.lastLabel;
+            if (LabelMethodItem.lastLabelAddress == codeAddress) {
+                returnLabel = LabelMethodItem.lastLabel;
+            }
             returnedReg = -1;
             return false;
         } else if (value >= 0xf && value <= 0x011) { //return value
@@ -114,8 +116,10 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
             writer.write(' ');
             writeFirstRegister(writer, MethodDefinition.getDalvikReturnType());
             writer.write(";\n\n");
-            returnedReg = getFirstRegister();
-            returnLabel = LabelMethodItem.lastLabel;
+            if (LabelMethodItem.lastLabelAddress == codeAddress) {
+                returnedReg = getFirstRegister();
+                returnLabel = LabelMethodItem.lastLabel;
+            }
             return false;
         } else if (value >= 0x012 && value <= 0x019) { //const primitive
             String literal = getLiteral();
@@ -255,23 +259,23 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
             writeFirstRegister(writer, getArrayType());
             return true;
         } else if (value >= 0x051 && value <= 0x058) { //iget
-            String contents = getReference(false);
             String secondRegister = getSecondRegisterContents();
-            if (!secondRegister.equals("this") || RegisterFormatter.isLocal(contents)) {
-                contents = getSecondRegisterContents() + "." + contents;
+            String contents = getReference(false);
+            if (!THIS.matcher(secondRegister).find() || RegisterFormatter.isLocal(contents)) {
+                contents = secondRegister + "." + contents;
             }
             return setFirstRegisterContents(writer, contents, getReferenceType());
         } else if (value >= 0x059 && value <= 0x05f) { //iput
-            int parameterRegisterCount = codeItem.getParent().method.getPrototype().getParameterRegisterCount()
-                    + (!AccessFlags.hasFlag(codeItem.getParent().accessFlags, AccessFlags.STATIC) ? 1 : 0);
-            int registerCount = codeItem.getRegisterCount();
-            int secondRegister = ((TwoRegisterInstruction) instruction).getRegisterB();
-            String referencedClass = getReference(false);
-            if (secondRegister != registerCount - parameterRegisterCount || RegisterFormatter.isLocal(referencedClass)) {
+            String secondRegisterContents = getSecondRegisterContents();
+            String referencedField = getReference(false);
+            if (THIS.matcher(referencedField).find()) {
+                return false;
+            }
+            if (!THIS.matcher(secondRegisterContents).find() || RegisterFormatter.isLocal(referencedField)) {
                 writeSecondRegister(writer);
                 writer.write('.');
             }
-            writer.write(referencedClass);
+            writer.write(referencedField);
             writer.write(" = ");
             writeFirstRegister(writer, getReferenceType());
             return true;
@@ -348,7 +352,7 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
             }
         } else {
             previousMethodCall = getReference(false) + invocation;
-            if (!instance.equals("this")) {
+            if (!THIS.matcher(instance).find()) {
                 previousMethodCall = instance + "." + previousMethodCall;
             }
         }
@@ -595,7 +599,7 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
             case GETTER:
 //              Getter: Instance: first arg, Field: comment -> PrevMethod = first.comment
                 previousMethodCall = "";
-                if (!firstArg.equals("this$0")) {
+                if (!THIS.matcher(firstArg).find()) {
                     previousMethodCall = firstArg + ".";
                 }
                 previousMethodCall += memberName;
@@ -604,7 +608,7 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
             case SETTER:
 //              Setter: Instance: first arg, Field: comment, Value: second arg -> print: first.comment = second, PrevMethod(Type) = null
                 String secondRegister = getRegisterFromInstruction((InvokeInstruction) instruction, 1, memberType);
-                if (!firstArg.equals("this$0")) {
+                if (!THIS.matcher(firstArg).find()) {
                     writer.write(firstArg);
                     writer.write('.');
                 }
@@ -615,7 +619,7 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
             case METHOD:
 //              Calls: Instance: first arg, Method: comment, Args, rest of args -> PrevMethod = first.comment(rest)
                 previousMethodCall = "";
-                if (!firstArg.equals("this$0")) {
+                if (!THIS.matcher(firstArg).find()) {
                     previousMethodCall = firstArg + ".";
                 }
                 previousMethodCall += memberName + getInvocation(parameterTypes, false);

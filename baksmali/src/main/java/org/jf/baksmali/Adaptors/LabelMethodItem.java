@@ -38,6 +38,7 @@ public class LabelMethodItem extends MethodItem {
     private int labelSequence;
 
     public static String lastLabel;
+    public static int lastLabelAddress;
 
     public LabelMethodItem(int codeAddress, String labelPrefix) {
         super(codeAddress);
@@ -79,6 +80,7 @@ public class LabelMethodItem extends MethodItem {
             label += Long.toHexString(this.getLabelAddress());
         }
         lastLabel = label;
+        lastLabelAddress = codeAddress;
         return label;
     }
 

@@ -46,6 +46,7 @@ public class RegisterFormatter {
     private static String[] registerTypes;
     private static boolean[] locals;
     private static final Pattern STRING_BUILDER_PATTERN = Pattern.compile("new StringBuilder\\(\\)\\.append\\((.*)\\)\\.toString\\(\\)");
+    private static final Pattern INNER_THIS = Pattern.compile("^this\\$[0-9]$");
 
     public static void newRegisterSet(int registers) {
         registerContents = new String[registers];
@@ -84,6 +85,8 @@ public class RegisterFormatter {
                 return TypeFormatter.zeroAs(suggestedDalvikType);
             } else if (registerContent.equals("1")) {
                 return TypeFormatter.oneAs(suggestedDalvikType);
+            } else if (INNER_THIS.matcher(registerContent).find()) {
+                return TypeFormatter.getType(registerTypes[register]) + ".this";
             }
             return registerContent;
         } else {
