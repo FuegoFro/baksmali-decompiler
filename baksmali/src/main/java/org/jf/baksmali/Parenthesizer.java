@@ -42,7 +42,9 @@ public class Parenthesizer {
     }
 
     public static String ensureNoUnenclosedSpaces(String expression) {
-        if (findUnenclosedSections(expression).size() > 0) {
+        ArrayList<String> sections = findUnenclosedSections(expression);
+        if (sections.size() > 0 &&
+                !(sections.size() ==  1 && sections.get(0) == null && expression.startsWith("new "))) {
             expression = "(" + expression + ")";
         }
         return expression;
