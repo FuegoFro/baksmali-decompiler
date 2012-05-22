@@ -591,38 +591,55 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
 
     private boolean handleAccessor(IndentingWriter writer, List<TypeIdItem> parameterTypes) throws IOException {
         AccessedMember member = getAccessedMember();
-        String firstArg = getRegisterFromInstruction((InvokeInstruction) instruction, 0, NUMBER);
+        int accessorType = member.getAccessedMemberType();
+        String first = getRegisterFromInstruction((InvokeInstruction) instruction, 0, NUMBER);
         String memberName = ReferenceFormatter.getReference(member.getAccessedMember(), false);
         String memberType = ReferenceFormatter.getReferenceType(member.getAccessedMember());
 
-        switch (member.getAccessedMemberType()) {
+        if (THIS.matcher(first).find()) {
+            first = "";
+        } else {
+            first += ".";
+        }
+
+        String second = null;
+        if (accessorType == SETTER || accessorType == INCREMENTER_BY_VALUE) {
+            second = getRegisterFromInstruction((InvokeInstruction) instruction, 1, memberType);
+        }
+
+        switch (accessorType) {
             case GETTER:
-//              Getter: Instance: first arg, Field: comment -> PrevMethod = first.comment
-                previousMethodCall = "";
-                if (!THIS.matcher(firstArg).find()) {
-                    previousMethodCall = firstArg + ".";
-                }
-                previousMethodCall += memberName;
+//              Getter: Instance: first arg, Field: member -> PrevMethod = first.member
+                previousMethodCall = first + memberName;
                 previousMethodCallReturnType = memberType;
                 return false;
             case SETTER:
-//              Setter: Instance: first arg, Field: comment, Value: second arg -> print: first.comment = second, PrevMethod(Type) = null
-                String secondRegister = getRegisterFromInstruction((InvokeInstruction) instruction, 1, memberType);
-                if (!THIS.matcher(firstArg).find()) {
-                    writer.write(firstArg);
-                    writer.write('.');
-                }
+//              Setter: Instance: first arg, Field: member, Value: second arg -> print: first.member = second, PrevMethod(Type) = null
+                writer.write(first);
                 writer.write(memberName);
                 writer.write(" = ");
-                writer.write(secondRegister);
+                writer.write(second);
                 return true;
             case METHOD:
-//              Calls: Instance: first arg, Method: comment, Args, rest of args -> PrevMethod = first.comment(rest)
-                previousMethodCall = "";
-                if (!THIS.matcher(firstArg).find()) {
-                    previousMethodCall = firstArg + ".";
-                }
-                previousMethodCall += memberName + getInvocation(parameterTypes, false);
+//              Calls: Instance: first arg, Method: member, Args, rest of args -> PrevMethod = first.member(rest)
+                previousMethodCall = first + memberName + getInvocation(parameterTypes, false);
+                previousMethodCallReturnType = memberType;
+                return false;
+            case INCREMENTER_BY_VALUE:
+//              +=: Instance: first arg, Field: member, Value: second arg -> first.member += second
+                writer.write(first);
+                writer.write(memberName);
+                writer.write(" += ");
+                writer.write(second);
+                return true;
+            case INCREMENTER_BY_ONE:
+//              ++: Instance: first arg, Field: member -> PrevMethod = first.member++
+                previousMethodCall = first + memberName + "++";
+                previousMethodCallReturnType = memberType;
+                return false;
+            case DECREMENTER_BY_ONE:
+//              --: Instance: first arg, Field: member -> PrevMethod = first.member--
+                previousMethodCall = first + memberName + "--";
                 previousMethodCallReturnType = memberType;
                 return false;
         }

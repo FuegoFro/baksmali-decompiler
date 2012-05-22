@@ -29,7 +29,7 @@
 package org.jf.dexlib.Code.Analysis;
 
 import org.jf.dexlib.*;
-import org.jf.dexlib.Code.Format.Instruction22c;
+import org.jf.dexlib.Code.Format.Format;
 import org.jf.dexlib.Code.Instruction;
 import org.jf.dexlib.Code.InstructionWithReference;
 import org.jf.dexlib.Util.AccessFlags;
@@ -40,6 +40,9 @@ public class SyntheticAccessorResolver {
     public static final int METHOD = 0;
     public static final int GETTER = 1;
     public static final int SETTER = 2;
+    public static final int INCREMENTER_BY_VALUE = 3;
+    public static final int INCREMENTER_BY_ONE = 4;
+    public static final int DECREMENTER_BY_ONE = 5;
 
     private final DexFileClassMap classMap;
     private final HashMap<MethodIdItem, AccessedMember> resolvedAccessors = new HashMap<MethodIdItem, AccessedMember>();
@@ -84,25 +87,38 @@ public class SyntheticAccessorResolver {
                 if (instructions.length < 2 || instructions.length > 3) {
                     return null;
                 }
-                InstructionWithReference instruction = (InstructionWithReference)instructions[0];
-                MethodIdItem referencedMethodIdItem = (MethodIdItem)instruction.getReferencedItem();
+                InstructionWithReference instruction = (InstructionWithReference) instructions[0];
+                MethodIdItem referencedMethodIdItem = (MethodIdItem) instruction.getReferencedItem();
 
                 accessedMember = new AccessedMember(METHOD, referencedMethodIdItem);
                 resolvedAccessors.put(methodIdItem, accessedMember);
                 return accessedMember;
             }
+            case Format21c:
             case Format22c: {
-                //a synthetic field access should be exactly 2 instructions. The set/put, and then the return
-                if (instructions.length != 2) {
-                    return null;
-                }
-                Instruction22c instruction = (Instruction22c)instructions[0];
-                FieldIdItem referencedFieldIdItem = (FieldIdItem)instruction.getReferencedItem();
+                InstructionWithReference instruction = (InstructionWithReference) instructions[0];
+                FieldIdItem referencedFieldIdItem = (FieldIdItem) instruction.getReferencedItem();
 
-                if (instruction.opcode.setsRegister() || instruction.opcode.setsWideRegister()) {
-                    accessedMember = new AccessedMember(GETTER, referencedFieldIdItem);
+                if (instructions.length == 2) {
+                    //a synthetic field access should be exactly 2 instructions. The set/put, and then the return
+                    if (instruction.opcode.setsRegister() || instruction.opcode.setsWideRegister()) {
+                        accessedMember = new AccessedMember(GETTER, referencedFieldIdItem);
+                    } else if (instructions.length == 2) {
+                        accessedMember = new AccessedMember(SETTER, referencedFieldIdItem);
+                    }
+                } else if (instructions.length == 4) {
+                    // Increment operations have 4 instructions
+                    if (instructions[1].opcode.format == Format.Format12x) {
+                        // If it doesn't have a literal it adds a passed in value
+                        accessedMember = new AccessedMember(INCREMENTER_BY_VALUE, referencedFieldIdItem);
+                    } else {
+                        accessedMember = new AccessedMember(INCREMENTER_BY_ONE, referencedFieldIdItem);
+                    }
+                } else if (instructions.length == 5) {
+                    // Decrement by one operation has 5 instructions
+                    accessedMember = new AccessedMember(DECREMENTER_BY_ONE, referencedFieldIdItem);
                 } else {
-                    accessedMember = new AccessedMember(SETTER, referencedFieldIdItem);
+                    return null;
                 }
 
                 resolvedAccessors.put(methodIdItem, accessedMember);
