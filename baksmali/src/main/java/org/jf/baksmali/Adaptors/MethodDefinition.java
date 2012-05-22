@@ -312,7 +312,8 @@ public class MethodDefinition {
 
         LinkedList<String> rtn = new LinkedList<String>();
 
-        if (!AccessFlags.hasFlag(encodedMethod.accessFlags, AccessFlags.STATIC)) {
+        if (!AccessFlags.hasFlag(encodedMethod.accessFlags, AccessFlags.STATIC) &&
+                !AccessFlags.hasFlag(encodedMethod.accessFlags, AccessFlags.ABSTRACT)) {
             rtn.add("this");
         }
 

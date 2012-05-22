@@ -27,7 +27,7 @@ public class SignatureFormatter {
                                 writer.write(parseClassSignature(signature));
                                 break;
                             case Method:
-                                //This method actually writes any generics the method defines and the return type.
+                                //This method actually only writes any generics the method defines and the return type.
                                 // It also sets the parameter types of the current method.
                                 writer.write(parseMethodSignature(signature));
                                 break;
@@ -81,7 +81,7 @@ public class SignatureFormatter {
         }
 
         if (!(signature.hasNext() && signature.getNext().value.equals("("))) {
-            throw new IllegalStateException("Improper Signature Format!");
+            throw new IllegalStateException("Improper Method Signature Format!");
         }
 
         ArrayList<String> parameterTypes = new ArrayList<String>();
