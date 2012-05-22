@@ -19,4 +19,8 @@ fi
 mkdir "$frameworkDir"
 
 cd '/home/danny/workspace/decompiled/by-hand/baksmali/classes'
-java -cp .:~/.m2/repository/commons-cli/commons-cli/1.2/commons-cli-1.2.jar org.jf.baksmali.main -a 10 -o "$frameworkDir" '/home/danny/workspace/decompiled/cm7/classes.dex'
+if [ "$1" == "d" ]; then
+    java -Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=5005 -cp .:~/.m2/repository/commons-cli/commons-cli/1.2/commons-cli-1.2.jar org.jf.baksmali.main -a 10 -o "$frameworkDir" '/home/danny/workspace/decompiled/cm7/classes.dex'
+else
+    java -cp .:~/.m2/repository/commons-cli/commons-cli/1.2/commons-cli-1.2.jar org.jf.baksmali.main -a 10 -o "$frameworkDir" '/home/danny/workspace/decompiled/cm7/classes.dex'
+fi
