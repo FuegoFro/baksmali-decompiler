@@ -41,9 +41,12 @@ import org.jf.util.IndentingWriter;
 import org.jf.util.MemoryWriter;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class ClassDefinition {
     public static final String LJAVA_LANG_OBJECT = "Ljava/lang/Object;";
@@ -59,13 +62,18 @@ public class ClassDefinition {
     protected boolean validationErrors;
 
     private static HashSet<String> imports = null;
-    private static boolean isInterface;
     private static String dalvikClassName = "";
     private static String javaClassName = "";
     private static String superClass = "";
-    public static boolean isInnerClass = false;
     private int innerClassAccessFlags = 0;
+    private static boolean isInnerClass = false;
     private static boolean isAnonymous = false;
+    private static boolean isInterface;
+    private static boolean isEnum;
+
+    private static final Pattern ENUM_VALUE_MATCHER = Pattern.compile("[ ]*(.+) = .+\\(\".+\", \\d+(, .+)?\\);");
+    private static final Pattern ENUM_IS_DEFAULT_CONSTRUCTOR = Pattern.compile("(.+)\\(String p1, int p2(, .+)?\\) \\{");
+
 
     // Stores inner classes in memory to be added to enclosing classes
     // Key is dalvik type of inner class, value is class contents
@@ -77,10 +85,6 @@ public class ClassDefinition {
         this.classDataItem = classDefItem.getClassData();
         buildAnnotationMaps();
         findFieldsSetInStaticConstructor();
-    }
-
-    public static boolean isAnonymous() {
-        return isAnonymous;
     }
 
     public boolean hadValidationErrors() {
@@ -182,8 +186,16 @@ public class ClassDefinition {
         return dalvikClassName.equals(dalvikClassDescription);
     }
 
+    public static boolean isAnonymous() {
+        return isAnonymous;
+    }
+
     public static boolean isInterface() {
         return isInterface;
+    }
+
+    public static boolean isEnum() {
+        return isEnum;
     }
 
     public static String getDalvikClassName() {
@@ -198,7 +210,13 @@ public class ClassDefinition {
         return innerClasses;
     }
 
-    private void parseInnerClassDetails() {
+    private void parseClassDetails() {
+        setClassName();
+        setSuper();
+        setInterfaces();
+        isInterface = AccessFlags.hasFlag(classDefItem.getAccessFlags(), AccessFlags.INTERFACE);
+        isEnum = AccessFlags.hasFlag(classDefItem.getAccessFlags(), AccessFlags.ENUM);
+
         isInnerClass = false;
         innerClassAccessFlags = 0;
         isAnonymous = false;
@@ -262,7 +280,7 @@ public class ClassDefinition {
      */
     public boolean writeTo(IndentingWriter writer) throws IOException {
         imports = new HashSet<String>();
-        parseInnerClassDetails();
+        parseClassDetails();
 
         MemoryWriter body = new MemoryWriter();
         writeBody(new IndentingWriter(body));
@@ -288,20 +306,25 @@ public class ClassDefinition {
     }
 
     private void writeBody(IndentingWriter writer) throws IOException {
-        setClassName();
-        setSuper();
-        setInterfaces();
         if (!isAnonymous) {
             if (!writeClass(writer)) {
-                writeSuper(writer);
+                if (!isEnum) {
+                    writeSuper(writer);
+                }
                 writeInterfaces(writer);
             }
         }
         writer.write(" {");
         writer.indent(4);
         writeAnnotations(writer);
+        if (isEnum) {
+            writeEnumValues(writer);
+        }
         writeStaticFields(writer);
         writeInstanceFields(writer);
+        if (isEnum) {
+            writeEnumConstructor(writer);
+        }
         writeDirectMethods(writer);
         writeVirtualMethods(writer);
         writeInnerClasses(writer);
@@ -334,7 +357,7 @@ public class ClassDefinition {
 
     private boolean writeClass(IndentingWriter writer) throws IOException {
         writeAccessFlags(writer);
-        if (!isInterface) {
+        if (!isInterface && !isEnum) {
             writer.write("class ");
         }
 
@@ -359,7 +382,10 @@ public class ClassDefinition {
     }
 
     private void writeAccessFlags(IndentingWriter writer) throws IOException {
-        isInterface = AccessFlags.hasFlag(classDefItem.getAccessFlags(), AccessFlags.INTERFACE);
+        if (isEnum) {
+            writer.write("public enum ");
+            return;
+        }
         int classAccessFlags = classDefItem.getAccessFlags();
         if (isInnerClass) {
             classAccessFlags = innerClassAccessFlags;
@@ -492,6 +518,22 @@ public class ClassDefinition {
         if (directMethods == null || directMethods.length == 0) {
             return;
         }
+        if (isEnum) { // Enum constructors, valueOf and values are handled separately and should not be printed
+            if (directMethods.length < 3) {
+                return;
+            }
+            ArrayList<ClassDataItem.EncodedMethod> noConstructors = new ArrayList<ClassDataItem.EncodedMethod>();
+            for (ClassDataItem.EncodedMethod directMethod : directMethods) {
+                String methodName = directMethod.method.getMethodName().getStringValue();
+                if (!methodName.equals("<clinit>") &&
+                        !methodName.equals("<init>") &&
+                        !methodName.equals("valueOf") &&
+                        !methodName.equals("values")) {
+                    noConstructors.add(directMethod);
+                }
+            }
+            directMethods = noConstructors.toArray(new ClassDataItem.EncodedMethod[noConstructors.size()]);
+        }
 
         writer.write("\n\n");
         writer.write("// direct methods\n");
@@ -555,6 +597,58 @@ public class ClassDefinition {
                         imports.addAll(namedInnerClass.getImports());
                     }
                 }
+            }
+        }
+    }
+
+    private void writeEnumValues(IndentingWriter writer) throws IOException {
+        MemoryWriter classInit = new MemoryWriter();
+        for (ClassDataItem.EncodedMethod encodedMethod : classDataItem.getDirectMethods()) {
+            if (encodedMethod.method.getMethodName().getStringValue().equals("<clinit>")) {
+                IndentingWriter writer1 = new IndentingWriter(classInit);
+                writeMethods(writer1, new ClassDataItem.EncodedMethod[]{encodedMethod});
+                break;
+            }
+        }
+
+        String contents = classInit.getContents();
+        Matcher matcher = ENUM_VALUE_MATCHER.matcher(contents);
+        boolean first = true;
+        while (matcher.find()) {
+            if (!first) {
+                writer.write(",\n");
+            }
+            first = false;
+            writer.write(matcher.group(1));
+            String constructorArgs = matcher.group(2);
+            if (constructorArgs != null) {
+                writer.write("(");
+                writer.write(constructorArgs.substring(2));
+                writer.write(")");
+            }
+        }
+        writer.write(";");
+    }
+
+    private void writeEnumConstructor(IndentingWriter writer) throws IOException {
+        MemoryWriter instanceInit = new MemoryWriter();
+        for (ClassDataItem.EncodedMethod encodedMethod : classDataItem.getDirectMethods()) {
+            if (encodedMethod.method.getMethodName().getStringValue().equals("<init>")) {
+                writeMethods(new IndentingWriter(instanceInit), new ClassDataItem.EncodedMethod[]{encodedMethod});
+                break;
+            }
+        }
+
+        String constructor = instanceInit.getContents();
+        Matcher matcher = ENUM_IS_DEFAULT_CONSTRUCTOR.matcher(constructor);
+        if (matcher.find()) {
+            if (matcher.group(2) != null) {
+                writer.write(matcher.group(1));
+                writer.write("(");
+                writer.write(matcher.group(2).substring(2));
+                writer.write(") {\n");
+                int secondNewLine = constructor.indexOf('\n', constructor.indexOf('\n') + 1);
+                writer.write(constructor.substring(secondNewLine + 1));
             }
         }
     }

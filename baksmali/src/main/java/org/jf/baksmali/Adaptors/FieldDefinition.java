@@ -43,8 +43,9 @@ public class FieldDefinition {
                                EncodedValue initialValue, AnnotationSetItem annotationSet,
                                boolean setInStaticConstructor) throws IOException {
 
-        //don't print synthetic fields
-        if (AccessFlags.hasFlag(encodedField.accessFlags, AccessFlags.SYNTHETIC)) {
+        //don't print synthetic fields, enums get handled by the class constructor
+        if (AccessFlags.hasFlag(encodedField.accessFlags, AccessFlags.SYNTHETIC) ||
+                AccessFlags.hasFlag(encodedField.accessFlags, AccessFlags.ENUM)) {
             return;
         }
 

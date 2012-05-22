@@ -50,9 +50,12 @@ public class SignatureFormatter {
 
         Signature.Token superClass = signature.getNext();
         if (!superClass.value.equals("Object;")) {
-            stringBuilder.append(" extends ");
-            stringBuilder.append(superClass.value);
-            stringBuilder.append(parseGeneric(signature));
+            String superClassGeneric = parseGeneric(signature);
+            if (!ClassDefinition.isEnum()) {
+                stringBuilder.append(" extends ");
+                stringBuilder.append(superClass.value);
+                stringBuilder.append(superClassGeneric);
+            }
         }
         if (signature.hasNext()) {
             stringBuilder.append(" implements ");
@@ -76,7 +79,7 @@ public class SignatureFormatter {
         if (method.length() > 0) {
             method.append(" ");
         }
-        
+
         if (!(signature.hasNext() && signature.getNext().value.equals("("))) {
             throw new IllegalStateException("Improper Signature Format!");
         }
