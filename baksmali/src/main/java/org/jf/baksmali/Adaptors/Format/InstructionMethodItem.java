@@ -127,6 +127,9 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
             if (literal.equals("0")) {
                 type = null;
             }
+            if (instruction.opcode.setsWideRegister()) {
+                literal += "L";
+            }
             return setFirstRegisterContents(writer, literal, type);
         } else if (value >= 0x01a && value <= 0x01c) { //const string, class
             return setFirstRegisterContents(writer, getReference(false), getReferenceType());
