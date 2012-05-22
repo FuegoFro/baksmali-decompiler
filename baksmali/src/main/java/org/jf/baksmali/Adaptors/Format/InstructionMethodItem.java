@@ -489,26 +489,23 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
 
     protected String getInvocation(List<TypeIdItem> parameterTypes, boolean isStatic) {
         InvokeInstruction instruction = (InvokeInstruction) this.instruction;
-        final int regCount = instruction.getRegCount();
         int parameterSize = parameterTypes.size();
         int staticOffset = isStatic ? 0 : 1;
 
         StringBuilder invocation = new StringBuilder("(");
         boolean first = true;
-        for (int i = staticOffset; i < regCount; i++) {
+        for (int i = 0; i < parameterSize; i++) {
             if (!first) {
                 invocation.append(", ");
             }
             first = false;
 
             String dalvikType = null;
-            if (i < parameterSize) {
-                TypeIdItem typeIdItem = parameterTypes.get(i - staticOffset);
-                if (typeIdItem != null) {
-                    dalvikType = typeIdItem.toShorty();
-                }
+            TypeIdItem typeIdItem = parameterTypes.get(i);
+            if (typeIdItem != null) {
+                dalvikType = typeIdItem.toShorty();
             }
-            String registerContents = getRegisterFromInstruction(instruction, i, dalvikType);
+            String registerContents = getRegisterFromInstruction(instruction, i + staticOffset, dalvikType);
             invocation.append(registerContents);
         }
         invocation.append(")");
@@ -595,54 +592,63 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
     private boolean handleAccessor(IndentingWriter writer, List<TypeIdItem> parameterTypes) throws IOException {
         AccessedMember member = getAccessedMember();
         int accessorType = member.getAccessedMemberType();
-        String first = getRegisterFromInstruction((InvokeInstruction) instruction, 0, NUMBER);
+        String firstReg = getRegisterFromInstruction((InvokeInstruction) instruction, 0, NUMBER);
         String memberName = ReferenceFormatter.getReference(member.getAccessedMember(), false);
         String memberType = ReferenceFormatter.getReferenceType(member.getAccessedMember());
 
-        if (THIS.matcher(first).find()) {
-            first = "";
+        if (THIS.matcher(firstReg).find()) {
+            firstReg = "";
         } else {
-            first += ".";
+            firstReg += ".";
         }
 
-        String second = null;
+        String secondReg = null;
         if (accessorType == SETTER || accessorType == INCREMENTER_BY_VALUE) {
-            second = getRegisterFromInstruction((InvokeInstruction) instruction, 1, memberType);
+            secondReg = getRegisterFromInstruction((InvokeInstruction) instruction, 1, memberType);
         }
 
         switch (accessorType) {
             case GETTER:
 //              Getter: Instance: first arg, Field: member -> PrevMethod = first.member
-                previousMethodCall = first + memberName;
+                previousMethodCall = firstReg + memberName;
                 previousMethodCallReturnType = memberType;
                 return false;
             case SETTER:
 //              Setter: Instance: first arg, Field: member, Value: second arg -> print: first.member = second, PrevMethod(Type) = null
-                writer.write(first);
+                writer.write(firstReg);
                 writer.write(memberName);
                 writer.write(" = ");
-                writer.write(second);
+                writer.write(secondReg);
                 return true;
             case METHOD:
 //              Calls: Instance: first arg, Method: member, Args, rest of args -> PrevMethod = first.member(rest)
-                previousMethodCall = first + memberName + getInvocation(parameterTypes, false);
+                ArrayList<TypeIdItem> shortenedParameterTypes = new ArrayList<TypeIdItem>();
+                boolean firstParameterType = true;
+                for (TypeIdItem parameterType : parameterTypes) {
+                    if (firstParameterType) {
+                        firstParameterType = false;
+                        continue;
+                    }
+                    shortenedParameterTypes.add(parameterType);
+                }
+                previousMethodCall = firstReg + memberName + getInvocation(shortenedParameterTypes, false);
                 previousMethodCallReturnType = memberType;
                 return false;
             case INCREMENTER_BY_VALUE:
 //              +=: Instance: first arg, Field: member, Value: second arg -> first.member += second
-                writer.write(first);
+                writer.write(firstReg);
                 writer.write(memberName);
                 writer.write(" += ");
-                writer.write(second);
+                writer.write(secondReg);
                 return true;
             case INCREMENTER_BY_ONE:
 //              ++: Instance: first arg, Field: member -> PrevMethod = first.member++
-                previousMethodCall = first + memberName + "++";
+                previousMethodCall = firstReg + memberName + "++";
                 previousMethodCallReturnType = memberType;
                 return false;
             case DECREMENTER_BY_ONE:
 //              --: Instance: first arg, Field: member -> PrevMethod = first.member--
-                previousMethodCall = first + memberName + "--";
+                previousMethodCall = firstReg + memberName + "--";
                 previousMethodCallReturnType = memberType;
                 return false;
         }
