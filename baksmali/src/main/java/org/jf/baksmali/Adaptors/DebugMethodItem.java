@@ -28,6 +28,7 @@
 
 package org.jf.baksmali.Adaptors;
 
+import org.jf.baksmali.Adaptors.Format.InstructionMethodItem;
 import org.jf.dexlib.CodeItem;
 import org.jf.dexlib.StringIdItem;
 import org.jf.dexlib.TypeIdItem;
@@ -58,8 +59,9 @@ public abstract class DebugMethodItem extends MethodItem {
         writer.write(' ');
         writer.write(name.getStringValue());
         writer.write(" = ");
-        writer.write(RegisterFormatter.getRegisterContents(codeItem, register, type.getTypeDescriptor()));
+        writer.write(RegisterFormatter.getRegisterContents(register, codeItem, type.getTypeDescriptor()));
 
         RegisterFormatter.startLocal(register, name.getStringValue(), type.getTypeDescriptor());
+        InstructionMethodItem.clearAssignment();
     }
 }

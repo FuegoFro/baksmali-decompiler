@@ -29,6 +29,7 @@
 package org.jf.baksmali.Adaptors;
 
 import org.jf.baksmali.Adaptors.Format.InstructionMethodItem;
+import org.jf.dexlib.CodeItem;
 import org.jf.util.IndentingWriter;
 
 import java.io.IOException;
@@ -38,9 +39,13 @@ public abstract class MethodItem implements Comparable<MethodItem> {
 
     protected static String previousMethodCall = null;
     protected static String previousMethodCallReturnType = null;
+    protected static String previousNonPrintingAssignment;
+    protected static int previousNonPrintingAssignedRegister;
 
     protected MethodItem(int codeAddress) {
         this.codeAddress = codeAddress;
+        previousNonPrintingAssignment = null;
+        previousNonPrintingAssignedRegister = -1;
     }
 
     public int getCodeAddress() {
@@ -63,6 +68,7 @@ public abstract class MethodItem implements Comparable<MethodItem> {
 
     public boolean write(IndentingWriter writer) throws IOException {
         flushMethodCall(writer);
+        flushAssignment(writer);
         return writeTo(writer);
     }
 
@@ -80,5 +86,38 @@ public abstract class MethodItem implements Comparable<MethodItem> {
         writer.write(";\n");
         previousMethodCall = null;
         previousMethodCallReturnType = null;
+    }
+
+    private void flushAssignment(IndentingWriter writer) throws IOException {
+        boolean isNonReturningGoto = this instanceof InstructionMethodItem && ((InstructionMethodItem) this).isNonReturningGoto();
+
+        if (previousNonPrintingAssignment != null) {
+            if (previousNonPrintingAssignedRegister > -1 && RegisterFormatter.isLocal(previousNonPrintingAssignedRegister) ||
+                    isNonReturningGoto) {
+                writePreviousNonPrintingAssignment(writer);
+            }
+        }
+    }
+
+    protected void writePreviousNonPrintingAssignment(IndentingWriter writer) throws IOException {
+        String type = RegisterFormatter.getRegisterType(previousNonPrintingAssignedRegister);
+        if (previousNonPrintingAssignment.equals("0")) {
+            previousNonPrintingAssignment = TypeFormatter.zeroAs(type);
+        } else if (previousNonPrintingAssignment.equals("1")) {
+            previousNonPrintingAssignment = TypeFormatter.oneAs(type);
+        }
+
+        CodeItem codeItem = InstructionMethodItem.getCodeItem();
+        writer.write(RegisterFormatter.getRegisterName(previousNonPrintingAssignedRegister, codeItem));
+        writer.write(" = ");
+        writer.write(previousNonPrintingAssignment);
+        writer.write(";\n");
+        clearAssignment();
+    }
+
+
+    protected static void clearAssignment() {
+        previousNonPrintingAssignment = null;
+        previousNonPrintingAssignedRegister = -1;
     }
 }

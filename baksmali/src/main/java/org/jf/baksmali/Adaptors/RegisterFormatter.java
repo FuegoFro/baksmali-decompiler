@@ -66,16 +66,16 @@ public class RegisterFormatter {
         localType = null;
     }
 
-    public static String getRegisterContents(CodeItem codeItem, int register) {
-        return getRegisterContents(codeItem, register, getRegisterType(register));
+    public static String getRegisterContents(int register, CodeItem codeItem) {
+        return getRegisterContents(register, codeItem, getRegisterType(register));
     }
 
-    public static String getRegisterContents(CodeItem codeItem, int register, String suggestedDalvikType) {
+    public static String getRegisterContents(int register, CodeItem codeItem, String suggestedDalvikType) {
         if (isLocal(register) && localName[register] != null) {
             return localName[register];
         }
         if (registerContents == null || registerContents[register] == null) {
-            return getRegisterName(codeItem, register);
+            return getRegisterName(register, codeItem);
         }
 
         String registerContent = registerContents[register];
@@ -150,7 +150,13 @@ public class RegisterFormatter {
         locals[register] = true;
     }
 
-    public static String getRegisterName(CodeItem codeItem, int register) {
+    public static String getRegisterName(int register, CodeItem codeItem) {
+        // If it's local, return the variable name
+        if (isLocal(register) && RegisterFormatter.localName[register] != null) {
+            return RegisterFormatter.localName[register];
+        }
+
+        // Otherwise return the register name ala baksmali
         if (!baksmali.noParameterRegisters) {
             int parameterRegisterCount = codeItem.getParent().method.getPrototype().getParameterRegisterCount()
                     + (!AccessFlags.hasFlag(codeItem.getParent().accessFlags, AccessFlags.STATIC) ? 1 : 0);
@@ -172,7 +178,7 @@ public class RegisterFormatter {
                 range += ", ";
             }
             firstTime = false;
-            range += getRegisterContents(codeItem, register);
+            range += getRegisterContents(register, codeItem);
         }
         range += ")";
         return range;
@@ -188,7 +194,7 @@ public class RegisterFormatter {
      * @param register the register number
      */
     public static void writeTo(IndentingWriter writer, CodeItem codeItem, int register) throws IOException {
-        writer.write(getRegisterContents(codeItem, register));
+        writer.write(getRegisterContents(register, codeItem));
     }
 
     /**
