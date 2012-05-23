@@ -422,6 +422,7 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
     }
 
     private boolean setRegisterContents(IndentingWriter writer, int register, String contents, String type) throws IOException {
+        RegisterFormatter.setRegisterContents(register, contents, type);
         if (RegisterFormatter.isLocal(register)) {
             writeRegister(writer, register);
             writer.write(" = ");
@@ -436,7 +437,6 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
             return true;
         } else {
             previousNonPrintingAssignment = RegisterFormatter.getRegisterName(codeItem, register) + " = " + contents;
-            RegisterFormatter.setRegisterContents(register, contents, type);
             return false;
         }
     }

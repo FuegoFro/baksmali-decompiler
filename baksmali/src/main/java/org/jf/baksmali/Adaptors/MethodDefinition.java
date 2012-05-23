@@ -239,8 +239,7 @@ public class MethodDefinition {
             }
             if (firstParameter >= 0) {
                 // If name is null we want to go ahead and set the contents as null
-                RegisterFormatter.setRegisterContents(firstParameter + i, name, dalvikParameterTypes.get(i));
-                RegisterFormatter.setLocal(firstParameter + i, true); //Todo: should vars with null names be set as local?
+                RegisterFormatter.startLocal(firstParameter + i, name, dalvikParameterTypes.get(i)); //Todo: should vars with null names be set as local?
             }
             if (name == null) {
                 // But we want to print it's 'name'
@@ -649,12 +648,26 @@ public class MethodDefinition {
                     public void ProcessEndLocal(final int codeAddress, final int length, final int registerNum,
                                                 final StringIdItem name, final TypeIdItem type,
                                                 final StringIdItem signature) {
+                        methodItems.add(new DebugMethodItem(codeAddress, -1) {
+                            @Override
+                            public boolean writeTo(IndentingWriter writer) throws IOException {
+                                RegisterFormatter.endLocal(registerNum);
+                                return false;
+                            }
+                        });
                     }
 
                     @Override
                     public void ProcessRestartLocal(final int codeAddress, final int length, final int registerNum,
                                                     final StringIdItem name, final TypeIdItem type,
                                                     final StringIdItem signature) {
+                        methodItems.add(new DebugMethodItem(codeAddress, -1) {
+                            @Override
+                            public boolean writeTo(IndentingWriter writer) throws IOException {
+                                RegisterFormatter.restartLocal(registerNum);
+                                return false;
+                            }
+                        });
                     }
 
                     @Override

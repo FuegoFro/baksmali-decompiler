@@ -45,6 +45,8 @@ public class RegisterFormatter {
     private static String[] registerContents;
     private static String[] registerTypes;
     private static boolean[] locals;
+    private static String[] localName;
+    private static String[] localType;
     private static final Pattern STRING_BUILDER_PATTERN = Pattern.compile("new StringBuilder\\(\\)\\.append\\((.*)\\)\\.toString\\(\\)");
     private static final Pattern INNER_THIS = Pattern.compile("^this\\$[0-9]$");
 
@@ -52,49 +54,60 @@ public class RegisterFormatter {
         registerContents = new String[registers];
         registerTypes = new String[registers];
         locals = new boolean[registers];
+        localName = new String[registers];
+        localType = new String[registers];
     }
 
     public static void clearRegisters() {
         registerContents = null;
         registerTypes = null;
         locals = null;
+        localName = null;
+        localType = null;
     }
 
     public static String getRegisterContents(CodeItem codeItem, int register) {
-        return getRegisterContents(codeItem, register, registerTypes[register]);
+        return getRegisterContents(codeItem, register, getRegisterType(register));
     }
 
     public static String getRegisterContents(CodeItem codeItem, int register, String suggestedDalvikType) {
-        if (registerContents != null && registerContents[register] != null) {
-            String registerContent = registerContents[register];
-            Matcher stringBuilderMatcher = STRING_BUILDER_PATTERN.matcher(registerContent);
-            if (stringBuilderMatcher.find()) {
-                String[] subStrings = stringBuilderMatcher.group(1).split("\\)\\.append\\(");
-                StringBuilder prettyString = new StringBuilder();
-                boolean first = true;
-                for (String subString : subStrings) {
-                    if (!first) {
-                        prettyString.append(" + ");
-                    }
-                    first = false;
-                    prettyString.append(Parenthesizer.ensureNoUnenclosedSpaces(subString));
-                }
-                return prettyString.toString();
-            }
-            if (registerContent.equals("0")) {
-                return TypeFormatter.zeroAs(suggestedDalvikType);
-            } else if (registerContent.equals("1")) {
-                return TypeFormatter.oneAs(suggestedDalvikType);
-            } else if (INNER_THIS.matcher(registerContent).find()) {
-                return TypeFormatter.getType(registerTypes[register]) + ".this";
-            }
-            return registerContent;
-        } else {
+        if (isLocal(register) && localName[register] != null) {
+            return localName[register];
+        }
+        if (registerContents == null || registerContents[register] == null) {
             return getRegisterName(codeItem, register);
         }
+
+        String registerContent = registerContents[register];
+        Matcher stringBuilderMatcher = STRING_BUILDER_PATTERN.matcher(registerContent);
+        if (stringBuilderMatcher.find()) {
+            String[] subStrings = stringBuilderMatcher.group(1).split("\\)\\.append\\(");
+            StringBuilder prettyString = new StringBuilder();
+            boolean first = true;
+            for (String subString : subStrings) {
+                if (!first) {
+                    prettyString.append(" + ");
+                }
+                first = false;
+                prettyString.append(Parenthesizer.ensureNoUnenclosedSpaces(subString));
+            }
+            return prettyString.toString();
+        }
+
+        if (registerContent.equals("0")) {
+            return TypeFormatter.zeroAs(suggestedDalvikType);
+        } else if (registerContent.equals("1")) {
+            return TypeFormatter.oneAs(suggestedDalvikType);
+        } else if (INNER_THIS.matcher(registerContent).find()) {
+            return TypeFormatter.getType(registerTypes[register]) + ".this";
+        }
+        return registerContent;
     }
 
     public static String getRegisterType(int register) {
+        if (isLocal(register)) {
+            return localType[register];
+        }
         return registerTypes[register];
     }
 
@@ -123,8 +136,18 @@ public class RegisterFormatter {
         return isLocal;
     }
 
-    public static void setLocal(int register, boolean isLocal) {
-        locals[register] = isLocal;
+    public static void startLocal(int register, String name, String type) {
+        localName[register] = name;
+        localType[register] = type;
+        locals[register] = true;
+    }
+
+    public static void endLocal(int register) {
+        locals[register] = false;
+    }
+
+    public static void restartLocal(int register) {
+        locals[register] = true;
     }
 
     public static String getRegisterName(CodeItem codeItem, int register) {
