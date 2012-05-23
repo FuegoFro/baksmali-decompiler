@@ -72,7 +72,8 @@ public class ClassDefinition {
     private static boolean isEnum;
 
     private static final Pattern ENUM_VALUE_MATCHER = Pattern.compile("[ ]*(.+) = .+\\(\".+\", \\d+(, .+)?\\);");
-    private static final Pattern ENUM_IS_DEFAULT_CONSTRUCTOR = Pattern.compile("(.+)\\(String p1, int p2(, .+)?\\) \\{");
+    private static final Pattern ENUM_IS_DEFAULT_CONSTRUCTOR = Pattern.compile(".+\\(String p1, int p2\\) \\{\\n[ ]*super\\(p1, p2\\);\\n[ ]*return;\\n[ ]*\\n[ ]*\\}");
+    private static final Pattern ENUM_CONSTRUCTOR_DECLARATION = Pattern.compile("(.+)\\(String p1, int p2(, .+)?\\) \\{");
 
 
     // Stores inner classes in memory to be added to enclosing classes
@@ -640,12 +641,15 @@ public class ClassDefinition {
         }
 
         String constructor = instanceInit.getContents();
-        Matcher matcher = ENUM_IS_DEFAULT_CONSTRUCTOR.matcher(constructor);
-        if (matcher.find()) {
-            if (matcher.group(2) != null) {
+        if (!ENUM_IS_DEFAULT_CONSTRUCTOR.matcher(constructor).find()) {
+            Matcher matcher = ENUM_CONSTRUCTOR_DECLARATION.matcher(constructor);
+            if (matcher.find()) {
                 writer.write(matcher.group(1));
                 writer.write("(");
-                writer.write(matcher.group(2).substring(2));
+                String parameters = matcher.group(2);
+                if (parameters != null) {
+                    writer.write(parameters.substring(2));
+                }
                 writer.write(") {\n");
                 int secondNewLine = constructor.indexOf('\n', constructor.indexOf('\n') + 1);
                 writer.write(constructor.substring(secondNewLine + 1));
