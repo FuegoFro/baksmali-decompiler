@@ -41,6 +41,7 @@ import org.jf.dexlib.Code.InstructionWithReference;
 import org.jf.dexlib.Code.OffsetInstruction;
 import org.jf.dexlib.Code.Opcode;
 import org.jf.dexlib.Debug.DebugInstructionIterator;
+import org.jf.dexlib.EncodedValue.*;
 import org.jf.dexlib.Util.AccessFlags;
 import org.jf.dexlib.Util.ExceptionWithContext;
 import org.jf.dexlib.Util.SparseIntArray;
@@ -174,6 +175,7 @@ public class MethodDefinition {
             writer.write(encodedMethod.method.getMethodName().getStringValue());
         }
         writeSignature(writer, codeItem, parameterAnnotations);
+        writeThrownExceptions(writer, annotationSet);
 
 
         if (AccessFlags.hasFlag(encodedMethod.accessFlags, AccessFlags.NATIVE) ||
@@ -203,6 +205,26 @@ public class MethodDefinition {
             }
             writer.deindent(4);
             writer.write("}\n");
+        }
+    }
+
+    private static void writeAccessFlags(IndentingWriter writer, ClassDataItem.EncodedMethod encodedMethod)
+            throws IOException {
+        boolean isInterface = ClassDefinition.isInterface();
+        for (AccessFlags accessFlag : AccessFlags.getAccessFlagsForMethod(encodedMethod.accessFlags)) {
+            if (accessFlag.equals(AccessFlags.PUBLIC) ||
+                    accessFlag.equals(AccessFlags.PRIVATE) ||
+                    accessFlag.equals(AccessFlags.PROTECTED) ||
+                    accessFlag.equals(AccessFlags.STATIC) ||
+                    accessFlag.equals(AccessFlags.FINAL) ||
+                    accessFlag.equals(AccessFlags.SYNCHRONIZED) ||
+                    accessFlag.equals(AccessFlags.NATIVE) ||
+                    accessFlag.equals(AccessFlags.ABSTRACT) ||
+                    accessFlag.equals(AccessFlags.STRICTFP) ||
+                    (accessFlag.equals(AccessFlags.ABSTRACT) && !isInterface)) {
+                writer.write(accessFlag.toString());
+                writer.write(' ');
+            }
         }
     }
 
@@ -254,6 +276,32 @@ public class MethodDefinition {
         setParameterTypes(null);
     }
 
+    private void writeThrownExceptions(IndentingWriter writer, AnnotationSetItem annotationSet) throws IOException {
+        if (annotationSet != null) {
+            for (AnnotationItem annotation : annotationSet.getAnnotations()) {
+                if (annotation.getEncodedAnnotation().annotationType.getTypeDescriptor().equals("Ldalvik/annotation/Throws;")) {
+                    EncodedValue[] values = annotation.getEncodedAnnotation().values;
+                    if (values.length != 1) {
+                        System.err.println("Throws annotation does not have exactly one value!");
+                    } else if (!values[0].getValueType().equals(ValueType.VALUE_ARRAY)) {
+                        System.err.println("Throws annotation has non-array value!");
+                    } else {
+                        writer.write(" throws ");
+                        EncodedValue[] throwsValue = ((ArrayEncodedValue) values[0]).values;
+                        boolean first = true;
+                        for (EncodedValue encodedValue : throwsValue) {
+                            if (!first) {
+                                writer.write(", ");
+                            }
+                            first = false;
+                            writer.write(TypeFormatter.getType(((TypeEncodedValue) encodedValue).value));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     private static int getRegisterCount(ClassDataItem.EncodedMethod encodedMethod) {
         int totalRegisters = encodedMethod.codeItem.getRegisterCount();
         if (baksmali.useLocalsDirective) {
@@ -264,26 +312,6 @@ public class MethodDefinition {
             return totalRegisters - parameterRegisters;
         }
         return totalRegisters;
-    }
-
-    private static void writeAccessFlags(IndentingWriter writer, ClassDataItem.EncodedMethod encodedMethod)
-            throws IOException {
-        boolean isInterface = ClassDefinition.isInterface();
-        for (AccessFlags accessFlag : AccessFlags.getAccessFlagsForMethod(encodedMethod.accessFlags)) {
-            if (accessFlag.equals(AccessFlags.PUBLIC) ||
-                    accessFlag.equals(AccessFlags.PRIVATE) ||
-                    accessFlag.equals(AccessFlags.PROTECTED) ||
-                    accessFlag.equals(AccessFlags.STATIC) ||
-                    accessFlag.equals(AccessFlags.FINAL) ||
-                    accessFlag.equals(AccessFlags.SYNCHRONIZED) ||
-                    accessFlag.equals(AccessFlags.NATIVE) ||
-                    accessFlag.equals(AccessFlags.ABSTRACT) ||
-                    accessFlag.equals(AccessFlags.STRICTFP) ||
-                    (accessFlag.equals(AccessFlags.ABSTRACT) && !isInterface)) {
-                writer.write(accessFlag.toString());
-                writer.write(' ');
-            }
-        }
     }
 
     private LinkedList<String> getParameterNames(CodeItem codeItem, AnnotationSetRefList parameterAnnotations)
