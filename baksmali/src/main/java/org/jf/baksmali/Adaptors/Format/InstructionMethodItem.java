@@ -527,7 +527,21 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
 
     private List<TypeIdItem> getMethodParameterTypes() {
         MethodIdItem item = (MethodIdItem) ((InstructionWithReference) instruction).getReferencedItem();
-        return item.getPrototype().getParameterTypes();
+        List<TypeIdItem> parameterTypes = item.getPrototype().getParameterTypes();
+
+        if (parameterTypes.size() > 0) {
+            String lastParameter = parameterTypes.get(parameterTypes.size() - 1).getTypeDescriptor();
+            if (item.getMethodName().getStringValue().equals("<init>") &&
+                    ANONYMOUS_CLASS.matcher(lastParameter).find()) {
+                // Remove the last parameter to call the non-synthetic constructor
+                ArrayList<TypeIdItem> nonSyntheticConstructor = new ArrayList<TypeIdItem>();
+                for (int i = 0; i < parameterTypes.size() - 1; i++) {
+                    nonSyntheticConstructor.add(parameterTypes.get(i));
+                }
+                parameterTypes = nonSyntheticConstructor;
+            }
+        }
+        return parameterTypes;
     }
 
     private String getArrayType() {
@@ -622,6 +636,7 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
                 return true;
             case METHOD:
 //              Calls: Instance: first arg, Method: member, Args, rest of args -> PrevMethod = first.member(rest)
+                // Remove the first parameter so that the registers agree with parameters to look non-static
                 ArrayList<TypeIdItem> shortenedParameterTypes = new ArrayList<TypeIdItem>();
                 boolean firstParameterType = true;
                 for (TypeIdItem parameterType : parameterTypes) {
