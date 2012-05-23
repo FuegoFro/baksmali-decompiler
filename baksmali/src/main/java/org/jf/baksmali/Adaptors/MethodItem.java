@@ -89,13 +89,14 @@ public abstract class MethodItem implements Comparable<MethodItem> {
     }
 
     private void flushAssignment(IndentingWriter writer) throws IOException {
-        boolean isNonReturningGoto = this instanceof InstructionMethodItem && ((InstructionMethodItem) this).isNonReturningGoto();
+        boolean keepPreviousAssignment = this instanceof InstructionMethodItem && ((InstructionMethodItem) this).keepPreviousAssignment();
 
-        if (previousNonPrintingAssignment != null) {
+        if (previousNonPrintingAssignment != null && !keepPreviousAssignment) {
             if (previousNonPrintingAssignedRegister > -1 && RegisterFormatter.isLocal(previousNonPrintingAssignedRegister) ||
-                    isNonReturningGoto) {
+                    keepPreviousAssignment) {
                 writePreviousNonPrintingAssignment(writer);
             }
+            clearAssignment();
         }
     }
 

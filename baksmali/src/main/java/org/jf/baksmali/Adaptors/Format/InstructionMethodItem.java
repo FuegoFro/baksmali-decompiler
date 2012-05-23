@@ -76,9 +76,10 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
         return codeItem;
     }
 
-    public boolean isNonReturningGoto() throws IOException {
+    public boolean keepPreviousAssignment() throws IOException {
         short value = getValue();
-        return 0x28 <= value && value <= 0x2a && !getTargetLabel().equals(returnLabel);
+        // Keep if is a cast or a goto
+        return value == 0x1f || (0x28 <= value && value <= 0x2a);
     }
 
     @Override
@@ -144,7 +145,15 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
             writeFirstRegister(writer);
             return true;
         } else if (value == 0x01f) { //check-cast
-            String contents = Parenthesizer.ensureNoUnenclosedSpaces(getFirstRegisterContents());
+            String contents = getFirstRegisterContents();
+            if (previousNonPrintingAssignment != null) {
+                if (getFirstRegister() == previousNonPrintingAssignedRegister) {
+                    contents = previousNonPrintingAssignment;
+                } else {
+                    writePreviousNonPrintingAssignment(writer);
+                }
+            }
+            contents = Parenthesizer.ensureNoUnenclosedSpaces(contents);
             return setFirstRegisterContents("(" + getReference(false) + ") " + contents, getReferenceType());
         } else if (value == 0x020) { // instanceof
             String contents = Parenthesizer.ensureOrderOfOperations(getOpcode(), getSecondRegisterContents(), getReference(false));
@@ -208,6 +217,9 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
                 }
                 writer.write(";\n\n");
             } else {
+                if (previousNonPrintingAssignment != null) {
+                    writePreviousNonPrintingAssignment(writer);
+                }
                 writer.write("//");
                 writeOpcode(writer);
                 writer.write(' ');
