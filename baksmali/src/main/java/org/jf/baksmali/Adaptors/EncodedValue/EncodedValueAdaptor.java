@@ -32,10 +32,20 @@ import org.jf.baksmali.Adaptors.ReferenceFormatter;
 import org.jf.util.IndentingWriter;
 import org.jf.baksmali.Renderers.*;
 import org.jf.dexlib.EncodedValue.*;
+import org.jf.util.MemoryWriter;
 
 import java.io.IOException;
 
 public abstract class EncodedValueAdaptor {
+    public static String get(EncodedValue encodedValue) {
+        MemoryWriter writtenValue = new MemoryWriter();
+        try {
+            writeTo(new IndentingWriter(writtenValue), encodedValue);
+        } catch (IOException ignore) {
+        }
+        return writtenValue.getContents();
+    }
+
     public static void writeTo(IndentingWriter writer, EncodedValue encodedValue) throws IOException {
         switch (encodedValue.getValueType()) {
             case VALUE_ANNOTATION:

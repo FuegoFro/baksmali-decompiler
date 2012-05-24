@@ -28,12 +28,10 @@
 
 package org.jf.baksmali.Adaptors;
 
+import org.jf.baksmali.Adaptors.EncodedValue.EncodedValueAdaptor;
 import org.jf.baksmali.InnerClass;
 import org.jf.dexlib.*;
 import org.jf.dexlib.Code.Analysis.ValidationException;
-import org.jf.dexlib.Code.Format.Instruction21c;
-import org.jf.dexlib.Code.Format.Instruction41c;
-import org.jf.dexlib.Code.Instruction;
 import org.jf.dexlib.EncodedValue.*;
 import org.jf.dexlib.Util.AccessFlags;
 import org.jf.dexlib.Util.SparseArray;
@@ -57,9 +55,10 @@ public class ClassDefinition {
     private SparseArray<AnnotationSetItem> fieldAnnotationsMap;
     private SparseArray<AnnotationSetRefList> parameterAnnotationsMap;
 
-    private SparseArray<FieldIdItem> fieldsSetInStaticConstructor;
-
     protected boolean validationErrors;
+
+    private HashMap<String, String> staticFieldInitialValues = new HashMap<String, String>();
+    private ArrayList<String> staticBlock = new ArrayList<String>();
 
     private static HashSet<String> imports = null;
     private static String dalvikClassName = "";
@@ -74,6 +73,8 @@ public class ClassDefinition {
     private static final Pattern ENUM_VALUE_MATCHER = Pattern.compile("[ ]*(.+) = .+\\(\".+\", \\d+(, .+)?\\);");
     private static final Pattern ENUM_IS_DEFAULT_CONSTRUCTOR = Pattern.compile(".+\\(String p1, int p2\\) \\{\\n[ ]*super\\(p1, p2\\);\\n[ ]*return;\\n[ ]*\\n[ ]*\\}");
     private static final Pattern ENUM_CONSTRUCTOR_DECLARATION = Pattern.compile("(.+)\\(String p1, int p2(, .+)?\\) \\{");
+    private static final Pattern STATIC_FIELD_INITAL_VALUE = Pattern.compile("^([ ]*)([^ ]+) = ([^\n]+(\\{.+\\1\\})?);\n", Pattern.DOTALL | Pattern.MULTILINE);
+    private static final Pattern STATIC_BLOCK_CONTENTS = Pattern.compile("([^\n]*)\n");
 
 
     // Stores inner classes in memory to be added to enclosing classes
@@ -85,7 +86,8 @@ public class ClassDefinition {
         this.classDefItem = classDefItem;
         this.classDataItem = classDefItem.getClassData();
         buildAnnotationMaps();
-        findFieldsSetInStaticConstructor();
+        parseClassDetails();
+        findStaticFieldInitializers();
     }
 
     public boolean hadValidationErrors() {
@@ -125,43 +127,69 @@ public class ClassDefinition {
                 });
     }
 
-    private void findFieldsSetInStaticConstructor() {
-        fieldsSetInStaticConstructor = new SparseArray<FieldIdItem>();
+    private void findStaticFieldInitializers() {
+        // Get initializers from class data
+        EncodedArrayItem encodedArrayItem = classDefItem.getStaticFieldInitializers();
+        if (encodedArrayItem != null) {
+            EncodedValue[] staticInitializers = encodedArrayItem.getEncodedArray().values;
+            ClassDataItem.EncodedField[] staticFields = classDataItem.getStaticFields();
 
+            for (int i = 0, staticFieldsLength = staticFields.length, staticInitializersLength = staticInitializers.length;
+                 i < staticFieldsLength && i < staticInitializersLength; i++) {
+                String staticField = staticFields[i].field.getFieldName().getStringValue();
+                String staticInitializer = EncodedValueAdaptor.get(staticInitializers[i]);
+                staticFieldInitialValues.put(staticField, staticInitializer);
+            }
+        }
+
+        // Get initializers from class constructor
         if (classDataItem == null) {
             return;
         }
 
-        for (ClassDataItem.EncodedMethod directMethod : classDataItem.getDirectMethods()) {
-            if (directMethod.method.getMethodName().getStringValue().equals("<clinit>") &&
-                    directMethod.codeItem != null) {
-                for (Instruction instruction : directMethod.codeItem.getInstructions()) {
-                    switch (instruction.opcode) {
-                        case SPUT:
-                        case SPUT_BOOLEAN:
-                        case SPUT_BYTE:
-                        case SPUT_CHAR:
-                        case SPUT_OBJECT:
-                        case SPUT_SHORT:
-                        case SPUT_WIDE: {
-                            Instruction21c ins = (Instruction21c) instruction;
-                            FieldIdItem fieldIdItem = (FieldIdItem) ins.getReferencedItem();
-                            fieldsSetInStaticConstructor.put(fieldIdItem.getIndex(), fieldIdItem);
-                            break;
-                        }
-                        case SPUT_JUMBO:
-                        case SPUT_BOOLEAN_JUMBO:
-                        case SPUT_BYTE_JUMBO:
-                        case SPUT_CHAR_JUMBO:
-                        case SPUT_OBJECT_JUMBO:
-                        case SPUT_SHORT_JUMBO:
-                        case SPUT_WIDE_JUMBO: {
-                            Instruction41c ins = (Instruction41c) instruction;
-                            FieldIdItem fieldIdItem = (FieldIdItem) ins.getReferencedItem();
-                            fieldsSetInStaticConstructor.put(fieldIdItem.getIndex(), fieldIdItem);
-                            break;
-                        }
+        MemoryWriter classInit = new MemoryWriter();
+        for (ClassDataItem.EncodedMethod encodedMethod : classDataItem.getDirectMethods()) {
+            if (encodedMethod.method.getMethodName().getStringValue().equals("<clinit>")) {
+                try {
+                    writeMethods(new IndentingWriter(classInit), new ClassDataItem.EncodedMethod[]{encodedMethod});
+                } catch (IOException ignore) {
+                }
+                break;
+            }
+        }
+        String contents = classInit.getContents();
+
+        if (isEnum) {
+            // Find enum constructor args
+            Matcher matcher = ENUM_VALUE_MATCHER.matcher(contents);
+            while (matcher.find()) {
+                String constructorArgs = matcher.group(2);
+                if (constructorArgs != null) {
+                    constructorArgs = constructorArgs.substring(2);
+                }
+                staticFieldInitialValues.put(matcher.group(1), constructorArgs);
+            }
+        } else {
+            // Find static field initializers and static block contents
+            int length = contents.length();
+            int pos = 0;
+            Matcher fieldValues = STATIC_FIELD_INITAL_VALUE.matcher(contents);
+            Matcher blockContents = STATIC_BLOCK_CONTENTS.matcher(contents);
+            while (pos < length) {
+                if (fieldValues.find(pos)) {
+                    staticFieldInitialValues.put(fieldValues.group(2), fieldValues.group(3));
+                    pos = fieldValues.end();
+                } else if (blockContents.find(pos)) {
+                    String line = blockContents.group(1);
+                    if (line == null) {
+                        continue;
                     }
+                    line = line.trim();
+                    if (line.equals("return;")) {
+                        break;
+                    }
+                    staticBlock.add(line);
+                    pos = blockContents.end();
                 }
             }
         }
@@ -281,7 +309,6 @@ public class ClassDefinition {
      */
     public boolean writeTo(IndentingWriter writer) throws IOException {
         imports = new HashSet<String>();
-        parseClassDetails();
 
         MemoryWriter body = new MemoryWriter();
         writeBody(new IndentingWriter(body));
@@ -318,14 +345,9 @@ public class ClassDefinition {
         writer.write(" {");
         writer.indent(4);
         writeAnnotations(writer);
-        if (isEnum) {
-            writeEnumValues(writer);
-        }
         writeStaticFields(writer);
         writeInstanceFields(writer);
-        if (isEnum) {
-            writeEnumConstructor(writer);
-        }
+        writeConstructors(writer);
         writeDirectMethods(writer);
         writeVirtualMethods(writer);
         writeInnerClasses(writer);
@@ -448,15 +470,6 @@ public class ClassDefinition {
         //if classDataItem is not null, then classDefItem won't be null either
         assert (classDefItem != null);
 
-        EncodedArrayItem encodedStaticInitializers = classDefItem.getStaticFieldInitializers();
-
-        EncodedValue[] staticInitializers;
-        if (encodedStaticInitializers != null) {
-            staticInitializers = encodedStaticInitializers.getEncodedArray().values;
-        } else {
-            staticInitializers = new EncodedValue[0];
-        }
-
         ClassDataItem.EncodedField[] encodedFields = classDataItem.getStaticFields();
         if (encodedFields == null || encodedFields.length == 0) {
             return;
@@ -465,23 +478,24 @@ public class ClassDefinition {
         writer.write("\n\n");
 
         boolean first = true;
-        for (int i = 0; i < encodedFields.length; i++) {
-            if (!first) {
-                writer.write('\n');
+        for (ClassDataItem.EncodedField field : encodedFields) {
+            //don't print synthetic fields
+            if (AccessFlags.hasFlag(field.accessFlags, AccessFlags.SYNTHETIC)) {
+                continue;
+            }
+
+            if (!first && isEnum) {
+                writer.write(",\n");
             }
             first = false;
 
-            ClassDataItem.EncodedField field = encodedFields[i];
-            EncodedValue encodedValue = null;
-            if (i < staticInitializers.length) {
-                encodedValue = staticInitializers[i];
-            }
+            String initialValue = staticFieldInitialValues.get(field.field.getFieldName().getStringValue());
             AnnotationSetItem annotationSet = fieldAnnotationsMap.get(field.field.getIndex());
 
-            boolean setInStaticConstructor =
-                    fieldsSetInStaticConstructor.get(field.field.getIndex()) != null;
-
-            FieldDefinition.writeTo(writer, field, encodedValue, annotationSet, setInStaticConstructor);
+            FieldDefinition.writeTo(writer, field, initialValue, annotationSet);
+        }
+        if (isEnum) {
+            writer.write(';');
         }
     }
 
@@ -505,8 +519,37 @@ public class ClassDefinition {
 
             AnnotationSetItem annotationSet = fieldAnnotationsMap.get(field.field.getIndex());
 
-            FieldDefinition.writeTo(writer, field, null, annotationSet, false);
+            FieldDefinition.writeTo(writer, field, null, annotationSet);
         }
+    }
+
+    private void writeConstructors(IndentingWriter writer) throws IOException {
+        // Write static block
+        if (!staticBlock.isEmpty()) {
+            writer.write("\nstatic {\n");
+            writer.indent(4);
+            for (String instruction : staticBlock) {
+                writer.write(instruction);
+                writer.write('\n');
+            }
+            writer.deindent(4);
+            writer.write("}\n");
+        }
+
+        if (classDataItem != null) {
+            for (ClassDataItem.EncodedMethod encodedMethod : classDataItem.getDirectMethods()) {
+                if (encodedMethod.method.getMethodName().getStringValue().equals("<init>")) {
+                    MemoryWriter instanceInit = new MemoryWriter();
+                    writeMethods(new IndentingWriter(instanceInit), new ClassDataItem.EncodedMethod[]{encodedMethod});
+                    String constructor = instanceInit.getContents();
+                    if (isEnum) {
+                        writeEnumConstructor(writer, constructor);
+                    }
+                }
+            }
+        }
+
+
     }
 
     private void writeDirectMethods(IndentingWriter writer) throws IOException {
@@ -519,22 +562,22 @@ public class ClassDefinition {
         if (directMethods == null || directMethods.length == 0) {
             return;
         }
-        if (isEnum) { // Enum constructors, valueOf and values are handled separately and should not be printed
-            if (directMethods.length < 3) {
-                return;
+
+        // Static constructors are handled separately and should not be printed
+        // Enum constructors, valueOf and values are handled separately and should not be printed
+        ArrayList<ClassDataItem.EncodedMethod> noConstructors = new ArrayList<ClassDataItem.EncodedMethod>();
+        for (ClassDataItem.EncodedMethod directMethod : directMethods) {
+            String methodName = directMethod.method.getMethodName().getStringValue();
+            if (methodName.equals("<clinit>") ||
+                    (isEnum &&
+                            (methodName.equals("<init>") ||
+                                    methodName.equals("valueOf") ||
+                                    methodName.equals("values")))) {
+                continue;
             }
-            ArrayList<ClassDataItem.EncodedMethod> noConstructors = new ArrayList<ClassDataItem.EncodedMethod>();
-            for (ClassDataItem.EncodedMethod directMethod : directMethods) {
-                String methodName = directMethod.method.getMethodName().getStringValue();
-                if (!methodName.equals("<clinit>") &&
-                        !methodName.equals("<init>") &&
-                        !methodName.equals("valueOf") &&
-                        !methodName.equals("values")) {
-                    noConstructors.add(directMethod);
-                }
-            }
-            directMethods = noConstructors.toArray(new ClassDataItem.EncodedMethod[noConstructors.size()]);
+            noConstructors.add(directMethod);
         }
+        directMethods = noConstructors.toArray(new ClassDataItem.EncodedMethod[noConstructors.size()]);
 
         writer.write("\n\n");
         writer.write("// direct methods\n");
@@ -602,45 +645,7 @@ public class ClassDefinition {
         }
     }
 
-    private void writeEnumValues(IndentingWriter writer) throws IOException {
-        MemoryWriter classInit = new MemoryWriter();
-        for (ClassDataItem.EncodedMethod encodedMethod : classDataItem.getDirectMethods()) {
-            if (encodedMethod.method.getMethodName().getStringValue().equals("<clinit>")) {
-                IndentingWriter writer1 = new IndentingWriter(classInit);
-                writeMethods(writer1, new ClassDataItem.EncodedMethod[]{encodedMethod});
-                break;
-            }
-        }
-
-        String contents = classInit.getContents();
-        Matcher matcher = ENUM_VALUE_MATCHER.matcher(contents);
-        boolean first = true;
-        while (matcher.find()) {
-            if (!first) {
-                writer.write(",\n");
-            }
-            first = false;
-            writer.write(matcher.group(1));
-            String constructorArgs = matcher.group(2);
-            if (constructorArgs != null) {
-                writer.write("(");
-                writer.write(constructorArgs.substring(2));
-                writer.write(")");
-            }
-        }
-        writer.write(";");
-    }
-
-    private void writeEnumConstructor(IndentingWriter writer) throws IOException {
-        MemoryWriter instanceInit = new MemoryWriter();
-        for (ClassDataItem.EncodedMethod encodedMethod : classDataItem.getDirectMethods()) {
-            if (encodedMethod.method.getMethodName().getStringValue().equals("<init>")) {
-                writeMethods(new IndentingWriter(instanceInit), new ClassDataItem.EncodedMethod[]{encodedMethod});
-                break;
-            }
-        }
-
-        String constructor = instanceInit.getContents();
+    private void writeEnumConstructor(IndentingWriter writer, String constructor) throws IOException {
         if (!ENUM_IS_DEFAULT_CONSTRUCTOR.matcher(constructor).find()) {
             Matcher matcher = ENUM_CONSTRUCTOR_DECLARATION.matcher(constructor);
             if (matcher.find()) {

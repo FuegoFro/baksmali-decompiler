@@ -28,11 +28,8 @@
 
 package org.jf.baksmali.Adaptors;
 
-import org.jf.baksmali.Adaptors.EncodedValue.EncodedValueAdaptor;
 import org.jf.dexlib.AnnotationSetItem;
 import org.jf.dexlib.ClassDataItem;
-import org.jf.dexlib.EncodedValue.EncodedValue;
-import org.jf.dexlib.EncodedValue.NullEncodedValue;
 import org.jf.dexlib.Util.AccessFlags;
 import org.jf.util.IndentingWriter;
 
@@ -40,28 +37,17 @@ import java.io.IOException;
 
 public class FieldDefinition {
     public static void writeTo(IndentingWriter writer, ClassDataItem.EncodedField encodedField,
-                               EncodedValue initialValue, AnnotationSetItem annotationSet,
-                               boolean setInStaticConstructor) throws IOException {
+                               String initialValue, AnnotationSetItem annotationSet) throws IOException {
+        String fieldName = encodedField.field.getFieldName().getStringValue();
 
-        //don't print synthetic fields, enums get handled by the class constructor
-        if (AccessFlags.hasFlag(encodedField.accessFlags, AccessFlags.SYNTHETIC) ||
-                AccessFlags.hasFlag(encodedField.accessFlags, AccessFlags.ENUM)) {
+        if (AccessFlags.hasFlag(encodedField.accessFlags, AccessFlags.ENUM)) {
+            writer.write(fieldName);
+            if (initialValue != null) {
+                writer.write("(");
+                writer.write(initialValue);
+                writer.write(")");
+            }
             return;
-        }
-
-        String fieldTypeDescriptor = encodedField.field.getFieldType().getTypeDescriptor();
-
-        if (setInStaticConstructor &&
-                encodedField.isStatic() &&
-                AccessFlags.hasFlag(encodedField.accessFlags, AccessFlags.FINAL) &&
-                initialValue != null &&
-                (
-                        //it's a primitive type, or it's an array/reference type and the initial value isn't null
-                        fieldTypeDescriptor.length() == 1 ||
-                                initialValue != NullEncodedValue.NullValue
-                )) {
-
-            writer.write("//the value of this static final field might be set in the static constructor\n");
         }
 
         writeAccessFlags(writer, encodedField);
@@ -69,10 +55,10 @@ public class FieldDefinition {
             writer.write(TypeFormatter.getType(encodedField.field.getFieldType()));
         }
         writer.write(' ');
-        writer.write(encodedField.field.getFieldName().getStringValue());
+        writer.write(fieldName);
         if (initialValue != null) {
             writer.write(" = ");
-            EncodedValueAdaptor.writeTo(writer, initialValue);
+            writer.write(initialValue);
         }
 
         writer.write(";\n");
