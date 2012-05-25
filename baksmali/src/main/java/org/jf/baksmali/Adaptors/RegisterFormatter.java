@@ -127,13 +127,14 @@ public class RegisterFormatter {
     }
 
     public static boolean isLocal(String registerContents) {
-        boolean isLocal = false;
-        for (int i = 0, localsLength = locals.length; i < localsLength; i++) {
-            if (locals[i]) {
-                isLocal = isLocal || registerContents.equals(RegisterFormatter.registerContents[i]);
+        if (registerContents != null) {
+            for (String name : localName) {
+                if (registerContents.equals(name)) {
+                    return true;
+                }
             }
         }
-        return isLocal;
+        return false;
     }
 
     public static void startLocal(int register, String name, String type) {
