@@ -414,10 +414,8 @@ public class ClassDefinition {
             classAccessFlags = innerClassAccessFlags;
         }
         for (AccessFlags accessFlag : AccessFlags.getAccessFlagsForClass(classAccessFlags)) {
-            if (accessFlag.equals(AccessFlags.PUBLIC) ||
-                    accessFlag.equals(AccessFlags.FINAL) ||
-                    accessFlag.equals(AccessFlags.INTERFACE) ||
-                    (accessFlag.equals(AccessFlags.ABSTRACT) && !isInterface)) {
+            if (!accessFlag.equals(AccessFlags.ANNOTATION) &&
+                    !(accessFlag.equals(AccessFlags.ABSTRACT) && isInterface)) {
                 writer.write(accessFlag.toString());
                 writer.write(' ');
             }
