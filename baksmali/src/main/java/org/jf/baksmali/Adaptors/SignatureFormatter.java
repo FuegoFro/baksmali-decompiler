@@ -49,7 +49,7 @@ public class SignatureFormatter {
         stringBuilder.append(parseGeneric(signature));
 
         Signature.Token superClass = signature.getNext();
-        if (!superClass.value.equals("Object;")) {
+        if (!superClass.value.equals("Object")) {
             String superClassGeneric = parseGeneric(signature);
             if (!ClassDefinition.isEnum()) {
                 stringBuilder.append(" extends ");
