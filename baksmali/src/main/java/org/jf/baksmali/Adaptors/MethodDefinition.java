@@ -219,7 +219,6 @@ public class MethodDefinition {
                     accessFlag.equals(AccessFlags.FINAL) ||
                     accessFlag.equals(AccessFlags.SYNCHRONIZED) ||
                     accessFlag.equals(AccessFlags.NATIVE) ||
-                    accessFlag.equals(AccessFlags.ABSTRACT) ||
                     accessFlag.equals(AccessFlags.STRICTFP) ||
                     (accessFlag.equals(AccessFlags.ABSTRACT) && !isInterface)) {
                 writer.write(accessFlag.toString());
