@@ -39,6 +39,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.jf.dexlib.Code.Analysis.SyntheticAccessorResolver.*;
@@ -49,6 +50,8 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
     public static final String OBJECT = "L;";
     private static final Pattern ANONYMOUS_CLASS = Pattern.compile("\\$\\d+;$");
     private static final Pattern THIS = Pattern.compile("([A-Za-z]\\.)?this");
+    private static final Pattern NEW_ARRAY = Pattern.compile("^new [^ ]+\\[([0-9]+)\\]$");
+    private static final Pattern LITERAL_ARRAY = Pattern.compile("^new [^ ]+\\[\\] \\{(.+)\\}$");
     protected static CodeItem codeItem;
     protected final T instruction;
 
@@ -263,14 +266,56 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
             writer.write("}\n");
             return false;
         } else if (value >= 0x044 && value <= 0x04a) { //aget
-            return setFirstRegisterContents(getSecondRegisterContents() + "[" + getThirdRegisterContents() + "]", getArrayType());
+            return setFirstRegisterContents(getSecondRegisterContents() + "[" + getThirdRegisterContents() + "]", getArrayElementType());
         } else if (value >= 0x04b && value <= 0x051) { //aput
+            String array = getSecondRegisterContents();
+            Matcher newArrayMatcher = NEW_ARRAY.matcher(array);
+            if (newArrayMatcher.find()) {
+                try {
+                    String arraySize = newArrayMatcher.group(1);
+                    StringBuilder newArray = new StringBuilder();
+                    newArray.append(array.substring(0, array.length() - (arraySize.length() + 1)));
+                    newArray.append("] {");
+                    int size = Integer.parseInt(arraySize);
+                    for (int i = 0; i < size; i++) {
+                        if (i != 0) {
+                            newArray.append(", ");
+                        }
+                        newArray.append("null");
+                    }
+                    newArray.append("}");
+                    array = newArray.toString();
+                } catch (NumberFormatException ignored) {
+                }
+            }
+            Matcher literalArrayMatcher = LITERAL_ARRAY.matcher(array);
+            if (literalArrayMatcher.find()) {
+                try {
+                    String literalValues = literalArrayMatcher.group(1);
+                    StringBuilder newArray = new StringBuilder();
+                    newArray.append(array.substring(0, array.length() - (literalValues.length() + 1)));
+                    String[] literalValuesArray = literalValues.split(", ");
+                    int index = Integer.parseInt(getThirdRegisterContents());
+                    literalValuesArray[index] = getFirstRegisterContents(getArrayElementType());
+                    for (int i = 0, literalValuesArrayLength = literalValuesArray.length; i < literalValuesArrayLength; i++) {
+                        if (i != 0) {
+                            newArray.append(", ");
+                        }
+                        newArray.append(literalValuesArray[i]);
+                    }
+                    newArray.append("}");
+                    return setRegisterContents(getSecondRegister(), newArray.toString(), getArrayType());
+                } catch (NumberFormatException ignored) {
+                }
+            }
+
+
             writeSecondRegister(writer);
             writer.write('[');
             writeThirdRegister(writer);
             writer.write(']');
             writer.write(" = ");
-            writeFirstRegister(writer, getArrayType());
+            writeFirstRegister(writer, getArrayElementType());
             return true;
         } else if (value >= 0x051 && value <= 0x058) { //iget
             String secondRegister = getSecondRegisterContents();
@@ -455,6 +500,10 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
         return RegisterFormatter.getRegisterContents(((SingleRegisterInstruction) instruction).getRegisterA(), codeItem);
     }
 
+    private String getFirstRegisterContents(String registerType) {
+        return RegisterFormatter.getRegisterContents(((SingleRegisterInstruction) instruction).getRegisterA(), codeItem, registerType);
+    }
+
     private String getSecondRegisterContents() {
         return RegisterFormatter.getRegisterContents(((TwoRegisterInstruction) instruction).getRegisterB(), codeItem);
     }
@@ -543,7 +592,11 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
     }
 
     private String getArrayType() {
-        String arrayType = RegisterFormatter.getRegisterType(getSecondRegister());
+        return RegisterFormatter.getRegisterType(getSecondRegister());
+    }
+
+    private String getArrayElementType() {
+        String arrayType = getArrayType();
         if (arrayType == null) {
 //            System.err.println("NULL ARRAY. In method " + MethodDefinition.getName() + " in class " + ClassDefinition.getName());
             return null;
