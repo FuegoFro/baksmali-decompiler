@@ -53,7 +53,7 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
     private static final Pattern NEW_ARRAY = Pattern.compile("^new [^ ]+\\[([0-9]+)\\]$");
     private static final Pattern LITERAL_ARRAY = Pattern.compile("^new [^ ]+\\[\\] \\{(.+)\\}$");
     protected static CodeItem codeItem;
-    protected final T instruction;
+    public final T instruction;
 
     private static int returnedReg;
     private static String returnLabel;
@@ -447,7 +447,7 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
         writer.write(getTargetLabel());
     }
 
-    protected String getTargetLabel() throws IOException {
+    public String getTargetLabel() throws IOException {
         //this method is overrided by OffsetInstructionMethodItem, and should only be called for the formats that
         //have a target
         throw new RuntimeException();

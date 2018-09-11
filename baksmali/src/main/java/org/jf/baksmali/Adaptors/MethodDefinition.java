@@ -28,7 +28,10 @@
 
 package org.jf.baksmali.Adaptors;
 
+import org.jf.baksmali.Adaptors.Format.IfMethodItem;
+import org.jf.baksmali.Adaptors.Format.InstructionMethodItem;
 import org.jf.baksmali.Adaptors.Format.InstructionMethodItemFactory;
+import org.jf.baksmali.Adaptors.Format.OffsetInstructionFormatMethodItem;
 import org.jf.baksmali.baksmali;
 import org.jf.dexlib.*;
 import org.jf.dexlib.Code.Analysis.AnalyzedInstruction;
@@ -44,6 +47,7 @@ import org.jf.dexlib.Debug.DebugInstructionIterator;
 import org.jf.dexlib.EncodedValue.*;
 import org.jf.dexlib.Util.AccessFlags;
 import org.jf.dexlib.Util.ExceptionWithContext;
+import org.jf.dexlib.Util.Pair;
 import org.jf.dexlib.Util.SparseIntArray;
 import org.jf.util.IndentingWriter;
 
@@ -187,7 +191,9 @@ public class MethodDefinition {
 
                 writer.write('\n');
 
-                for (MethodItem methodItem : getMethodItems()) {
+                List<MethodItem> methodItems = getMethodItems();
+                recoverControlFlow(methodItems);
+                for (MethodItem methodItem : methodItems) {
                     if (methodItem.write(writer)) {
                         writer.write(";\n");
                     }
@@ -200,6 +206,83 @@ public class MethodDefinition {
             writer.deindent(4);
             writer.write("}\n");
         }
+    }
+
+    private void recoverControlFlow(List<MethodItem> methodItems) {
+        Stack<Pair<OffsetInstructionFormatMethodItem, Integer>> inProgressIfs = new Stack<>();
+        LabelMethodItem returnLabel = null;
+
+        for (int i = 0; i < methodItems.size(); i++) {
+            final MethodItem methodItem = methodItems.get(i);
+            if (methodItem instanceof InstructionMethodItem) {
+                InstructionMethodItem instructionMethodItem = (InstructionMethodItem) methodItem;
+                final short value = instructionMethodItem.instruction.opcode.value;
+                if (value >= 0x032 && value <= 0x03d) {
+                    inProgressIfs.add(new Pair<>((OffsetInstructionFormatMethodItem) instructionMethodItem, i));
+                } else if (value >= 0x027 && value <= 0x02c) {
+                    // If this is a throw, goto, or switch, then we're encountering other types of control
+                    // flow, so bail on all potential If's we've seen so far.
+                    inProgressIfs.clear();
+                }
+            } else if (methodItem instanceof LabelMethodItem) {
+                LabelMethodItem labelMethodItem = (LabelMethodItem) methodItem;
+                int lowestPositionLookingForLabel = getLowestPositionLookingForLabel(inProgressIfs, labelMethodItem);
+                while (inProgressIfs.size() > lowestPositionLookingForLabel) {
+                    Pair<OffsetInstructionFormatMethodItem, Integer> entry = inProgressIfs.pop();
+                    OffsetInstructionFormatMethodItem offsetItem = entry.first;
+                    int startIndex = entry.second;
+
+                    if (offsetItem.getLabel() != labelMethodItem) {
+                        continue;
+                    }
+
+                    // We leave the original item in place, since we're going to replace it with an If item. Also
+                    // leave the label in place.
+                    List<MethodItem> subList = methodItems.subList(startIndex + 1, i);
+                    // Copy the sublist, then clear it to remove these items from the main list
+                    List<MethodItem> elseItems = new ArrayList<>(subList);
+                    subList.clear();
+                    // Create the new If item, using the original offset item where possible.
+                    IfMethodItem ifMethodItem = new IfMethodItem(
+                            offsetItem.codeAddress,
+                            offsetItem.getCodeItem(),
+                            offsetItem.instruction,
+                            new ArrayList<>(),
+                            elseItems);
+                    // Replace the original offset item
+                    methodItems.set(startIndex, ifMethodItem);
+                    // Reset our iteration index to just after updated item, which should be the label we were just
+                    // handling, so we can continue to process If's for that label and/or process the next item on our next loop.
+                    i = startIndex + 1;
+                }
+
+                // Determine if this looks like a return label.
+                if (i + 1 < methodItems.size() && methodItems.get(i + 1) instanceof InstructionMethodItem) {
+                    InstructionMethodItem instructionItem = (InstructionMethodItem) methodItems.get(i + 1);
+                    if (instructionItem.instruction.opcode.value >= 0x0e && instructionItem.instruction.opcode.value <= 0x011) {
+                        if (returnLabel != null) {
+                            throw new RuntimeException("Multiple Return labels");
+                        }
+                        returnLabel = labelMethodItem;
+                    }
+                }
+
+                // We've run into a non-return label (eg entry point) into this code, our analysis logic may no longer
+                // be sound. Clear the pending ifs.
+                if (labelMethodItem != returnLabel) {
+                    inProgressIfs.clear();
+                }
+            }
+        }
+    }
+
+    private int getLowestPositionLookingForLabel(Stack<Pair<OffsetInstructionFormatMethodItem, Integer>> inProgressIfs, LabelMethodItem labelMethodItem) {
+        for (int i = 0; i < inProgressIfs.size(); i++) {
+            if (inProgressIfs.get(i).first.getLabel() == labelMethodItem) {
+                return i;
+            }
+        }
+        return inProgressIfs.size();
     }
 
     private static void writeAccessFlags(IndentingWriter writer, ClassDataItem.EncodedMethod encodedMethod)

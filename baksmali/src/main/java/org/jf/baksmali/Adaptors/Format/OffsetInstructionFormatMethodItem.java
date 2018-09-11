@@ -50,7 +50,7 @@ public class OffsetInstructionFormatMethodItem<T extends Instruction & OffsetIns
     }
 
     @Override
-    protected String getTargetLabel() throws IOException {
+    public String getTargetLabel() throws IOException {
         return label.get();
     }
 
