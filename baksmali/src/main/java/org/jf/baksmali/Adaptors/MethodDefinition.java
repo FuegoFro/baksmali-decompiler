@@ -147,12 +147,6 @@ public class MethodDefinition {
         name = encodedMethod.method.getMethodName().getStringValue();
         returnType = encodedMethod.method.getPrototype().getReturnType();
 
-        //don't print synthetic methods or anonymous constructors
-        if (AccessFlags.hasFlag(encodedMethod.accessFlags, AccessFlags.SYNTHETIC) ||
-                (ClassDefinition.isAnonymous() && AccessFlags.hasFlag(encodedMethod.accessFlags, AccessFlags.CONSTRUCTOR))) {
-            return;
-        }
-
         if (codeItem != null) {
             RegisterFormatter.newRegisterSet(getRegisterCount(encodedMethod));
         } else {

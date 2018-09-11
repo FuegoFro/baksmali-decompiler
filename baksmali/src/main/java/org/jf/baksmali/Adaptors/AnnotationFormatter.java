@@ -41,17 +41,22 @@ public class AnnotationFormatter {
     public static void writeTo(IndentingWriter writer, AnnotationSetItem annotationSet) throws IOException {
         boolean first = true;
         for (AnnotationItem annotationItem : annotationSet.getAnnotations()) {
-            if (!first) {
+            String typeDescriptor = annotationItem.getEncodedAnnotation().annotationType.getTypeDescriptor();
+            if (typeDescriptor.equals("Ldalvik/annotation/Signature;") ||
+                    typeDescriptor.equals("Ldalvik/annotation/MemberClass;") ||
+                    typeDescriptor.equals("Ldalvik/annotation/EnclosingClass;") ||
+                    typeDescriptor.equals("Ldalvik/annotation/InnerClass;") ||
+                    typeDescriptor.equals("Ldalvik/annotation/EnclosingMethod;")) {
+                continue;
+            }
+            if (first) {
+                writer.write("\n\n");
+                writer.write("// annotations\n");
+            } else {
                 writer.write('\n');
             }
             first = false;
-            String typeDescriptor = annotationItem.getEncodedAnnotation().annotationType.getTypeDescriptor();
-            if (!(typeDescriptor.equals("Ldalvik/annotation/Signature;") ||
-                    typeDescriptor.equals("Ldalvik/annotation/MemberClass;") ||
-                    typeDescriptor.equals("Ldalvik/annotation/EnclosingClass;") ||
-                    typeDescriptor.equals("Ldalvik/annotation/InnerClass;"))) {
-                writeTo(writer, annotationItem);
-            }
+            writeTo(writer, annotationItem);
         }
     }
 

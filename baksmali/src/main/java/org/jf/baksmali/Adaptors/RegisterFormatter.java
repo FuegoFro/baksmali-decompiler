@@ -47,7 +47,7 @@ public class RegisterFormatter {
     private static boolean[] locals;
     private static String[] localName;
     private static String[] localType;
-    private static final Pattern STRING_BUILDER_PATTERN = Pattern.compile("new StringBuilder\\(\\)\\.append\\((.*)\\)\\.toString\\(\\)");
+    private static final Pattern STRING_BUILDER_PATTERN = Pattern.compile("^new StringBuilder\\(\\)\\.append\\((.*)\\)\\.toString\\(\\)$");
     private static final Pattern INNER_THIS = Pattern.compile("^this\\$[0-9]$");
 
     public static void newRegisterSet(int registers) {

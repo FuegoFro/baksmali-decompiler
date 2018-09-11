@@ -49,7 +49,7 @@ public class InstructionMethodItem<T extends Instruction> extends MethodItem {
     public static final String BOOLEAN = "Z";
     public static final String OBJECT = "L;";
     private static final Pattern ANONYMOUS_CLASS = Pattern.compile("\\$\\d+;$");
-    private static final Pattern THIS = Pattern.compile("([A-Za-z]\\.)?this");
+    private static final Pattern THIS = Pattern.compile("^([A-Za-z]\\.)?this$");
     private static final Pattern NEW_ARRAY = Pattern.compile("^new [^ ]+\\[([0-9]+)\\]$");
     private static final Pattern LITERAL_ARRAY = Pattern.compile("^new [^ ]+\\[\\] \\{(.+)\\}$");
     protected static CodeItem codeItem;

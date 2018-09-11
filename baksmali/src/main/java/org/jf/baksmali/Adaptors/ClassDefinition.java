@@ -151,7 +151,7 @@ public class ClassDefinition {
         for (ClassDataItem.EncodedMethod encodedMethod : classDataItem.getDirectMethods()) {
             if (encodedMethod.method.getMethodName().getStringValue().equals("<clinit>")) {
                 try {
-                    writeMethods(new IndentingWriter(classInit), new ClassDataItem.EncodedMethod[]{encodedMethod});
+                    writeMethods(new IndentingWriter(classInit), new ClassDataItem.EncodedMethod[]{encodedMethod}, null);
                 } catch (IOException ignore) {
                 }
                 break;
@@ -456,8 +456,6 @@ public class ClassDefinition {
             return;
         }
 
-        writer.write("\n\n");
-        writer.write("// annotations\n");
         AnnotationFormatter.writeTo(writer, annotationSet);
     }
 
@@ -473,8 +471,6 @@ public class ClassDefinition {
             return;
         }
 
-        writer.write("\n\n");
-
         boolean first = true;
         for (ClassDataItem.EncodedField field : encodedFields) {
             //don't print synthetic fields
@@ -482,7 +478,9 @@ public class ClassDefinition {
                 continue;
             }
 
-            if (!first && isEnum) {
+            if (first) {
+                writer.write("\n\n");
+            } else if (isEnum()) {
                 writer.write(",\n");
             }
             first = false;
@@ -507,10 +505,14 @@ public class ClassDefinition {
             return;
         }
 
-        writer.write("\n\n");
         boolean first = true;
         for (ClassDataItem.EncodedField field : classDataItem.getInstanceFields()) {
-            if (!first) {
+            if (AccessFlags.hasFlag(field.accessFlags, AccessFlags.SYNTHETIC)) {
+                continue;
+            }
+            if (first) {
+                writer.write("\n\n");
+            } else {
                 writer.write('\n');
             }
             first = false;
@@ -534,15 +536,14 @@ public class ClassDefinition {
             writer.write("}\n");
         }
 
-        if (classDataItem != null) {
+        // Handle enum constructor specially
+        if (isEnum && classDataItem != null) {
             for (ClassDataItem.EncodedMethod encodedMethod : classDataItem.getDirectMethods()) {
                 if (encodedMethod.method.getMethodName().getStringValue().equals("<init>")) {
                     MemoryWriter instanceInit = new MemoryWriter();
-                    writeMethods(new IndentingWriter(instanceInit), new ClassDataItem.EncodedMethod[]{encodedMethod});
+                    writeMethods(new IndentingWriter(instanceInit), new ClassDataItem.EncodedMethod[]{encodedMethod}, null);
                     String constructor = instanceInit.getContents();
-                    if (isEnum) {
-                        writeEnumConstructor(writer, constructor);
-                    }
+                    writeEnumConstructor(writer, constructor);
                 }
             }
         }
@@ -577,9 +578,7 @@ public class ClassDefinition {
         }
         directMethods = noConstructors.toArray(new ClassDataItem.EncodedMethod[noConstructors.size()]);
 
-        writer.write("\n\n");
-        writer.write("// direct methods\n");
-        writeMethods(writer, directMethods);
+        writeMethods(writer, directMethods, "direct methods");
     }
 
     private void writeVirtualMethods(IndentingWriter writer) throws IOException {
@@ -593,15 +592,24 @@ public class ClassDefinition {
             return;
         }
 
-        writer.write("\n\n");
-        writer.write("// virtual methods\n");
-        writeMethods(writer, virtualMethods);
+        writeMethods(writer, virtualMethods, "virtual methods");
     }
 
-    private void writeMethods(IndentingWriter writer, ClassDataItem.EncodedMethod[] methods) throws IOException {
+    private void writeMethods(IndentingWriter writer, ClassDataItem.EncodedMethod[] methods, String label) throws IOException {
         boolean first = true;
         for (ClassDataItem.EncodedMethod method : methods) {
-            if (!first) {
+            //don't print synthetic methods or anonymous constructors
+            if (AccessFlags.hasFlag(method.accessFlags, AccessFlags.SYNTHETIC) ||
+                    (ClassDefinition.isAnonymous() && AccessFlags.hasFlag(method.accessFlags, AccessFlags.CONSTRUCTOR))) {
+                return;
+            }
+
+            if (first) {
+                if (label != null) {
+                    writer.write("\n\n");
+                    writer.write("// " + label + "\n");
+                }
+            } else {
                 writer.write('\n');
             }
             first = false;

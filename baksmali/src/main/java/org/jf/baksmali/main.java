@@ -67,8 +67,10 @@ public class main {
         Properties properties = new Properties();
         String version = "(unknown)";
         try {
-            properties.load(templateStream);
-            version = properties.getProperty("application.version");
+            if (templateStream != null) {
+                properties.load(templateStream);
+                version = properties.getProperty("application.version");
+            }
         } catch (IOException ex) {
         }
         VERSION = version;
