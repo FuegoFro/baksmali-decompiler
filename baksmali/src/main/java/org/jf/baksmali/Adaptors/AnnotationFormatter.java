@@ -42,11 +42,14 @@ public class AnnotationFormatter {
         boolean first = true;
         for (AnnotationItem annotationItem : annotationSet.getAnnotations()) {
             String typeDescriptor = annotationItem.getEncodedAnnotation().annotationType.getTypeDescriptor();
-            if (typeDescriptor.equals("Ldalvik/annotation/Signature;") ||
-                    typeDescriptor.equals("Ldalvik/annotation/MemberClass;") ||
-                    typeDescriptor.equals("Ldalvik/annotation/EnclosingClass;") ||
-                    typeDescriptor.equals("Ldalvik/annotation/InnerClass;") ||
-                    typeDescriptor.equals("Ldalvik/annotation/EnclosingMethod;")) {
+            if (typeDescriptor.equals("Ldalvik/annotation/Signature;")
+                    || typeDescriptor.equals("Ldalvik/annotation/MemberClass;")
+                    || typeDescriptor.equals("Ldalvik/annotation/EnclosingClass;")
+                    || typeDescriptor.equals("Ldalvik/annotation/InnerClass;")
+                    || typeDescriptor.equals("Ldalvik/annotation/EnclosingMethod;")
+                    || typeDescriptor.equals("Ldalvik/annotation/Throws;")
+                    || typeDescriptor.equals("Ldalvik/annotation/MemberClasses;")
+            ) {
                 continue;
             }
             if (first) {

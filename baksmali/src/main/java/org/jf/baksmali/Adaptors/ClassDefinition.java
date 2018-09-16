@@ -39,10 +39,7 @@ import org.jf.util.IndentingWriter;
 import org.jf.util.MemoryWriter;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -601,7 +598,7 @@ public class ClassDefinition {
             //don't print synthetic methods or anonymous constructors
             if (AccessFlags.hasFlag(method.accessFlags, AccessFlags.SYNTHETIC) ||
                     (ClassDefinition.isAnonymous() && AccessFlags.hasFlag(method.accessFlags, AccessFlags.CONSTRUCTOR))) {
-                return;
+                continue;
             }
 
             if (first) {

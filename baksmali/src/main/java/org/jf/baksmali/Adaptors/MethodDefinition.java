@@ -212,6 +212,16 @@ public class MethodDefinition {
         Stack<Pair<OffsetInstructionFormatMethodItem, Integer>> inProgressIfs = new Stack<>();
         LabelMethodItem returnLabel = null;
 
+        // One run through to get the number of times each labelled is referred to
+        Map<LabelMethodItem, Integer> labelUsageCounts = new HashMap<>();
+        for (MethodItem methodItem : methodItems) {
+            if (methodItem instanceof OffsetInstructionFormatMethodItem) {
+                LabelMethodItem label = ((OffsetInstructionFormatMethodItem) methodItem).getLabel();
+                labelUsageCounts.put(label, labelUsageCounts.getOrDefault(label, 0) + 1);
+            }
+        }
+
+        // A second run through to actually transform the instructions
         for (int i = 0; i < methodItems.size(); i++) {
             final MethodItem methodItem = methodItems.get(i);
             if (methodItem instanceof InstructionMethodItem) {
@@ -254,6 +264,8 @@ public class MethodDefinition {
                     // Reset our iteration index to just after updated item, which should be the label we were just
                     // handling, so we can continue to process If's for that label and/or process the next item on our next loop.
                     i = startIndex + 1;
+                    // We've just consumed one usage of that label, go ahead and reduce its usage count.
+                    labelUsageCounts.put(labelMethodItem, labelUsageCounts.get(labelMethodItem) - 1);
                 }
 
                 // Determine if this looks like a return label.
@@ -267,9 +279,14 @@ public class MethodDefinition {
                     }
                 }
 
-                // We've run into a non-return label (eg entry point) into this code, our analysis logic may no longer
-                // be sound. Clear the pending ifs.
-                if (labelMethodItem != returnLabel) {
+                if (labelMethodItem == returnLabel || labelUsageCounts.getOrDefault(labelMethodItem, -1) == 0) {
+                    // This is either a return or a label where we've already handled all things that go to it.
+                    // Don't render this label, because we shouldn't be printing out out anything that goes to it.
+                    methodItems.remove(i);
+                    i--;
+                } else {
+                    // We've run into a label that isn't a return and still has things going to it, which is an entry point
+                    // into this code, our analysis logic may no longer be sound. Clear the pending ifs.
                     inProgressIfs.clear();
                 }
             }
