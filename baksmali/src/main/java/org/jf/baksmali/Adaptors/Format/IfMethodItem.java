@@ -1,5 +1,6 @@
 package org.jf.baksmali.Adaptors.Format;
 
+import org.jetbrains.annotations.NotNull;
 import org.jf.baksmali.Adaptors.MethodItem;
 import org.jf.baksmali.Adaptors.RegisterFormatter;
 import org.jf.baksmali.Adaptors.TypeFormatter;
@@ -12,6 +13,7 @@ import org.jf.dexlib.CodeItem;
 import org.jf.util.IndentingWriter;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 public class IfMethodItem extends MethodItem {
@@ -28,8 +30,8 @@ public class IfMethodItem extends MethodItem {
     };
     private final CodeItem underlyingCodeItem;
     private final Instruction underlyingInstruction;
-    private final List<MethodItem> thenItems;
-    private final List<MethodItem> elseItems;
+    public final List<MethodItem> thenItems;
+    public final List<MethodItem> elseItems;
 
     public IfMethodItem(int codeAddress, CodeItem underlyingCodeItem, Instruction underlyingInstruction, List<MethodItem> thenItems, List<MethodItem> elseItems) {
         super(codeAddress);
@@ -83,16 +85,7 @@ public class IfMethodItem extends MethodItem {
         }
         
         writer.write("if (");
-        final String other;
-        if (opcode.value >= 0x032 && opcode.value <= 0x037) {
-            // Compare to register
-            other = getSecondRegisterContents();
-        } else {
-            // Compare to zero
-            other = TypeFormatter.zeroAs(RegisterFormatter.getRegisterType(getFirstRegister()));
-        }
-        // TODO - Don't generate things like "== false"
-        writer.write(Parenthesizer.ensureOrderOfOperations(opcode.name, getFirstRegisterContents(), other));
+        writeCondition(writer, opcode);
         writer.write(") {\n");
         writer.indent(4);
         writeItems(writer, thenItems);
@@ -105,6 +98,31 @@ public class IfMethodItem extends MethodItem {
         writer.deindent(4);
         writer.write("}\n");
         return false;
+    }
+
+    private void writeCondition(IndentingWriter writer, Opcode opcode) throws IOException {
+        final String other;
+        if (opcode.value >= 0x032 && opcode.value <= 0x037) {
+            // Compare to register
+            other = getSecondRegisterContents();
+        } else {
+            // Compare to zero
+            String registerType = RegisterFormatter.getRegisterType(getFirstRegister());
+            if ("Z".equals(registerType)) {
+                // Special case for comparing against a boolean, so we don't write things like " == false"
+                if (opcode == Opcode.IF_EQZ) {
+                    writer.write("!");
+                    writer.write(getFirstRegisterContents());
+                } else if (opcode == Opcode.IF_NEZ) {
+                    writer.write(getFirstRegisterContents());
+                } else {
+                    throw new RuntimeException("Unexpected opcode: " + opcode);
+                }
+                return;
+            }
+            other = TypeFormatter.zeroAs(registerType);
+        }
+        writer.write(Parenthesizer.ensureOrderOfOperations(opcode.name, getFirstRegisterContents(), other));
     }
 
     private Opcode flipOpcode(Opcode opcode) {
@@ -136,5 +154,27 @@ public class IfMethodItem extends MethodItem {
             default:
                 throw new RuntimeException("Unexpected opcode: " + opcode);
         }
+    }
+
+    @NotNull
+    public IfMethodItem withNewItems(@NotNull List<MethodItem> thenItems, @NotNull List<MethodItem> elseItems) {
+        return new IfMethodItem(
+                this.codeAddress,
+                this.underlyingCodeItem,
+                this.underlyingInstruction,
+                thenItems,
+                elseItems
+        );
+    }
+
+    @NotNull
+    public static IfMethodItem emptyFromOffsetInstruction(@NotNull OffsetInstructionFormatMethodItem<?> offsetItem) {
+        return new IfMethodItem(
+                offsetItem.getCodeAddress(),
+                InstructionMethodItem.getCodeItem(),
+                offsetItem.instruction,
+                new ArrayList<>(),
+                new ArrayList<>()
+        );
     }
 }

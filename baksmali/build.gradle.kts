@@ -1,5 +1,6 @@
 plugins {
     application
+    kotlin("jvm")
 }
 
 application {
@@ -9,4 +10,5 @@ application {
 dependencies {
     compile(project(":dexlib"))
     compile(project(":util"))
+    compile(kotlin("stdlib"))
 }
